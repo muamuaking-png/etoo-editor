@@ -7,30 +7,32 @@ import { Workspace } from 'polotno/canvas/workspace';
 import { Toolbar } from 'polotno/toolbar/toolbar';
 import { ZoomButtons } from 'polotno/toolbar/zoom-buttons';
 
+// 1. 에디터 엔진 설정
 const store = createStore({ key: '', showCredit: true });
-store.setSize(6000, 900); // 기본 현수막 크기
+store.setSize(6000, 900); // 기본 규격
 store.addPage();
 
-// --- 스타일 정의 (이것만 씁니다) ---
+// 2. 버튼 스타일 정의 (공통으로 사용)
 const btnStyle = { 
   color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', 
   cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', marginLeft: '8px' 
 };
 
-// --- 1. JSON 설계도 복사 버튼 ---
+// 3. 설계도(JSON) 추출 버튼 컴포넌트
 function JSONCopyButton() {
+  const copyJSON = () => {
+    const json = JSON.stringify(store.toJSON());
+    navigator.clipboard.writeText(json);
+    alert('✅ 설계도(JSON) 복사 완료! 메모장에 저장하세요.');
+  };
   return (
-    <button onClick={() => {
-      const json = JSON.stringify(store.toJSON());
-      navigator.clipboard.writeText(json);
-      alert('✅ 설계도(JSON) 복사 완료! 메모장에 붙여넣으세요.');
-    }} style={{...btnStyle, background: '#10b981'}}>
+    <button onClick={copyJSON} style={{...btnStyle, background: '#10b981'}}>
       📋 JSON 복사
     </button>
   );
 }
 
-// --- 2. 시안확정(발주) 버튼 ---
+// 4. 시안확정(발주) 버튼 컴포넌트
 function ConfirmButton() {
   const [loading, setLoading] = useState(false);
   const handleExport = async () => {
@@ -44,6 +46,7 @@ function ConfirmButton() {
         method: 'POST', body: formData 
       });
       const data = await resp.json();
+      // Tally로 데이터 전송
       window.top.location.href = `https://tally.so/r/xXNz09?project_id=ETOO_${Date.now()}&image_url=${encodeURIComponent(data.secure_url)}`;
     } catch (err) { 
       alert('오류 발생: ' + err.message); 
@@ -58,12 +61,13 @@ function ConfirmButton() {
   );
 }
 
+// 5. 메인 앱 화면 구성
 function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <PolotnoContainer>
         <SidePanelWrap>
-          {/* 템플릿, 사이즈조절, 글자, 업로드만 남겼습니다 */}
+          {/* 왼쪽 메뉴: 템플릿, 사이즈조절, 텍스트, 업로드 */}
           <SidePanel store={store} sections={['templates', 'resize', 'text', 'upload']} />
         </SidePanelWrap>
         <WorkspaceWrap>
