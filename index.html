@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>주식회사 이투 시안 에디터</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #f8f9fa; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #ffffff; }
     #root { width: 100vw; height: 100vh; display: none; }
     #status { 
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -13,7 +13,7 @@
     }
     .loader { border: 5px solid #f3f3f3; border-top: 5px solid #2563eb; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    #msg { color: #555; font-size: 16px; }
+    #msg { color: #555; font-size: 16px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -25,57 +25,57 @@
 
   <script type="module">
     const msg = document.getElementById('msg');
-    
-    // 단계별 메시지 업데이트 함수
-    const updateStatus = (text) => {
-      console.log(text);
-      msg.innerText = text;
-    };
+    const updateStatus = (text) => { msg.innerText = text; };
 
-    try {
-      updateStatus("1단계: 엔진 라이브러리 연결 중...");
-      
-      // 가장 범용적인 CDN으로 교체
-      import { createInstance } from 'https://unpkg.com/polotno@1.3.16/dist/index.js';
+    async function launchEditor() {
+      try {
+        // 1단계: 엔진 다운로드 시작 (다이내믹 임포트)
+        updateStatus("1단계: 엔진 라이브러리 다운로드 중 (약 5초)...");
+        const { createInstance } = await import('https://unpkg.com/polotno@1.3.16/dist/index.js');
 
-      updateStatus("2단계: 편집기 시동 거는 중...");
-      
-      const root = document.getElementById('root');
-      const { store } = createInstance({
-        container: root,
-        key: '', 
-      });
+        // 2단계: 에디터 초기화
+        updateStatus("2단계: 에디터 시동 거는 중...");
+        const root = document.getElementById('root');
+        const { store } = createInstance({
+          container: root,
+          key: '', 
+        });
 
-      updateStatus("3단계: 시안 데이터 불러오는 중...");
-      
-      store.loadJSON({
-        width: 6000, height: 900,
-        pages: [{ id: "p1", elements: [
-          {type:"text", x:3000, y:450, width:5000, text:"이곳을 클릭해 시안을 수정하세요", fontSize:200, align:"center", fill:"#000"}
-        ]}]
-      });
+        // 3단계: 시안 데이터 주입
+        updateStatus("3단계: 현수막 시안 구성 중...");
+        store.loadJSON({
+          width: 6000, height: 900,
+          pages: [{ id: "p1", elements: [
+            {type:"text", x:3000, y:450, width:5000, text:"이곳을 클릭해 시안을 수정하세요", fontSize:200, align:"center", fill:"#000"}
+          ]}]
+        });
 
-      // 완료
-      document.getElementById('status').style.display = 'none';
-      root.style.display = 'block';
+        // 완료: 로딩 화면 제거
+        document.getElementById('status').style.display = 'none';
+        root.style.display = 'block';
 
-      // 발주 버튼 생성
-      setInterval(() => {
-        const header = document.querySelector('.polotno-header-right') || document.querySelector('[class*="header-right"]');
-        if (header && !document.getElementById('etoo-btn')) {
-          const btn = document.createElement('button');
-          btn.id = 'etoo-btn';
-          btn.innerText = '시안확정 (발주하기)';
-          btn.style = 'background:#2563eb; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; margin-left:10px;';
-          btn.onclick = () => { window.top.location.href = "https://tally.so/r/xXNz09?project_id=ETOO_" + Date.now(); };
-          header.appendChild(btn);
-        }
-      }, 500);
+        // 발주 버튼 생성 (반복 체크)
+        const checkBtn = setInterval(() => {
+          const header = document.querySelector('.polotno-header-right') || document.querySelector('[class*="header-right"]');
+          if (header && !document.getElementById('etoo-btn')) {
+            const btn = document.createElement('button');
+            btn.id = 'etoo-btn';
+            btn.innerText = '시안확정 (발주서 이동)';
+            btn.style = 'background:#2563eb; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; margin-left:10px; z-index:9999;';
+            btn.onclick = () => { window.top.location.href = "https://tally.so/r/xXNz09?project_id=ETOO_" + Date.now(); };
+            header.appendChild(btn);
+            clearInterval(checkBtn);
+          }
+        }, 500);
 
-    } catch (err) {
-      updateStatus("오류 발생: " + err.message);
-      console.error(err);
+      } catch (err) {
+        updateStatus("로드 실패: " + err.message);
+        console.error(err);
+      }
     }
+
+    // 약간의 시간차를 두고 실행하여 초기 로딩 메시지 보장
+    setTimeout(launchEditor, 500);
   </script>
 </body>
 </html>
