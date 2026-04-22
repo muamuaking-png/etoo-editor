@@ -2,59 +2,67 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주식회사 이투 에디터</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: white; }
-    #root { width: 100vw; height: 100vh; }
-    #loading { 
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      display: flex; align-items: center; justify-content: center; 
-      font-family: sans-serif; background: #fff; z-index: 10;
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #ffffff; }
+    #root { width: 100vw; height: 100vh; display: none; }
+    #status { 
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-family: sans-serif; text-align: center; color: #333;
     }
   </style>
 </head>
 <body>
-  <div id="loading">잠시만 기다려주세요...</div>
+  <div id="status">
+    <div id="loader">시안 에디터를 준비하고 있습니다...</div>
+    <div id="error-log" style="color: red; margin-top: 10px; font-size: 14px;"></div>
+  </div>
+
   <div id="root"></div>
 
   <script type="module">
-    // 1. 가장 안정적인 라이브러리 주소로 교체
-    import { createInstance } from 'https://cdn.skypack.dev/polotno';
+    // 1. 가장 빠르고 안정적인 엔진 주소 사용
+    import { createInstance } from 'https://esm.sh/polotno@1.3.16';
 
     async function init() {
+      const status = document.getElementById('loader');
+      const errorLog = document.getElementById('error-log');
+      const root = document.getElementById('root');
+
       try {
-        const container = document.getElementById('root');
+        console.log("엔진 로드 시작...");
         
         // 2. 에디터 생성
         const { store } = createInstance({
-          container: container,
+          container: root,
           key: '', // 무료 버전
         });
 
-        // 3. 디자인 데이터 주입 (최대한 가볍게 구성)
+        // 3. 디자인 주입
         store.loadJSON({
-          width: 6000,
-          height: 900,
+          width: 6000, height: 900,
           pages: [{
             id: "p1",
             elements: [
               {type:"text", x:3000, y:400, width:5000, text:"2026년 마케팅그룹 워크샵", fontSize:250, align:"center", fill:"#00c4a6"},
-              {type:"text", x:3000, y:650, width:5000, text:"내용을 입력하세요", fontSize:150, align:"center", fill:"#000000"}
+              {type:"text", x:3000, y:650, width:5000, text:"내용을 입력해주세요", fontSize:150, align:"center", fill:"#000000"}
             ]
           }]
         });
 
-        // 로딩 메시지 삭제
-        document.getElementById('loading').style.display = 'none';
+        // 성공 시 화면 전환
+        document.getElementById('status').style.display = 'none';
+        root.style.display = 'block';
 
-        // 4. 시안확정 버튼 (반복 체크로 확실히 생성)
+        // 4. 발주 버튼 생성 (상단바 우측)
         const checkHeader = setInterval(() => {
           const header = document.querySelector('.polotno-header-right') || document.querySelector('[class*="header-right"]');
           if (header) {
             clearInterval(checkHeader);
-            if (!document.getElementById('etoo-btn')) {
+            if (!document.getElementById('etoo-confirm-btn')) {
               const btn = document.createElement('button');
-              btn.id = 'etoo-btn';
+              btn.id = 'etoo-confirm-btn';
               btn.innerText = '시안확정 (발주하기)';
               btn.style = 'background:#2563eb; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; margin-left:10px;';
               btn.onclick = () => {
@@ -66,7 +74,9 @@
         }, 500);
 
       } catch (err) {
-        document.getElementById('loading').innerHTML = "화면을 불러오지 못했습니다. <br>에러내용: " + err.message;
+        console.error("초기화 실패:", err);
+        status.innerText = "에디터 로드 실패";
+        errorLog.innerText = "에러 원인: " + err.message;
       }
     }
 
