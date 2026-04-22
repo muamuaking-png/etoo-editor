@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { createStore } from 'polotno/model/store';
 import { PolotnoContainer, SidePanelWrap, WorkspaceWrap } from 'polotno';
 import { SidePanel } from 'polotno/side-panel';
-import { Workspace } from 'polotno/workspace';
+import { Workspace } from 'polotno/canvas/workspace'; // 주소 수정 완료!
 import { Toolbar } from 'polotno/toolbar/toolbar';
 import { ZoomButtons } from 'polotno/toolbar/zoom-buttons';
 
-// 스타일 시트 (안정적인 경로)
+// 스타일 시트
 import '@blueprintjs/core/lib/css/blueprint.css';
 import '@blueprintjs/icons/lib/css/blueprint-icons.css';
 
