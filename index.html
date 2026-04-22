@@ -2,49 +2,85 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주식회사 이투 에디터</title>
   <style>
-    body, html, #root { margin: 0; padding: 0; width: 100%; height: 100vh; overflow: hidden; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #f4f4f4; }
+    #root { width: 100%; height: 100vh; display: none; }
+    #loading-screen { 
+      display: flex; flex-direction: column; align-items: center; justify-content: center; 
+      height: 100vh; font-family: sans-serif; 
+    }
+    .spinner {
+      border: 4px solid #f3f3f3; border-top: 4px solid #2563eb;
+      border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <div id="status-text">에디터 엔진을 불러오는 중입니다...</div>
+  </div>
+
   <div id="root"></div>
+
   <script type="module">
-    import { createInstance } from 'https://unpkg.com/polotno@latest/dist/index.js';
+    // 라이브러리 로드 오류 방지를 위해 캐시 방지 파라미터 추가
+    import { createInstance } from 'https://unpkg.com/polotno@latest/dist/index.js?module';
 
-    const { store } = createInstance({
-      container: document.getElementById('root'),
-      key: '', // 무료 버전
-    });
+    async function startEditor() {
+      const statusText = document.getElementById('status-text');
+      try {
+        const container = document.getElementById('root');
+        
+        // 1. 에디터 생성
+        const { store } = createInstance({
+          container: container,
+          key: '', // 무료 버전
+        });
 
-    // 현수막 6000x900 사이즈 및 템플릿 로드
-    store.loadJSON({
-      width: 6000,
-      height: 900,
-      pages: [{
-        id: "p1",
-        elements: [
-          {type:"text", x:3000, y:400, width:5000, text:"2026년 마케팅그룹 워크샵", fontSize:250, align:"center", fill:"#00c4a6"},
-          {type:"text", x:3000, y:650, width:5000, text:"2026. 04. 21   테스트홍보팀", fontSize:150, align:"center", fill:"#000000"}
-        ]
-      }]
-    });
+        // 2. 화면 전환 (로딩창 숨기고 에디터 표시)
+        document.getElementById('loading-screen').style.display = 'none';
+        container.style.display = 'block';
 
-    // 상단바에 시안확정 버튼 생성
-    setInterval(() => {
-      const header = document.querySelector('.polotno-header-right') || document.querySelector('[class*="header-right"]');
-      if (header && !document.getElementById('etoo-btn')) {
-        const btn = document.createElement('button');
-        btn.id = 'etoo-btn';
-        btn.innerText = '시안확정 (발주서 이동)';
-        btn.style = 'background:#2563eb; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-left:10px;';
-        btn.onclick = () => {
-          // Softr 전체 창을 탈리(Tally)로 이동
-          window.top.location.href = "https://tally.so/r/xXNz09?project_id=ETOO_" + Date.now();
-        };
-        header.appendChild(btn);
+        // 3. 디자인 데이터 주입 (현수막 6000x900)
+        store.loadJSON({
+          width: 6000,
+          height: 900,
+          pages: [{
+            id: "p1",
+            elements: [
+              {type:"text", x:3000, y:400, width:5000, text:"2026년 마케팅그룹 워크샵", fontSize:250, align:"center", fill:"#00c4a6"},
+              {type:"text", x:3000, y:650, width:5000, text:"2026. 04. 21   테스트홍보팀", fontSize:150, align:"center", fill:"#000000"}
+            ]
+          }]
+        });
+
+        // 4. 상단 버튼 생성
+        setInterval(() => {
+          const header = document.querySelector('.polotno-header-right') || document.querySelector('[class*="header-right"]');
+          if (header && !document.getElementById('etoo-btn')) {
+            const btn = document.createElement('button');
+            btn.id = 'etoo-btn';
+            btn.innerText = '시안확정 (발주서 이동)';
+            btn.style = 'background:#2563eb; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-left:10px; z-index:9999;';
+            btn.onclick = () => {
+              window.top.location.href = "https://tally.so/r/xXNz09?project_id=ETOO_" + Date.now();
+            };
+            header.appendChild(btn);
+          }
+        }, 500);
+
+      } catch (err) {
+        console.error(err);
+        statusText.innerHTML = "<span style='color:red;'>에러 발생: " + err.message + "</span><br>브라우저를 새로고침 해주세요.";
       }
-    }, 500);
+    }
+
+    startEditor();
   </script>
 </body>
 </html>
