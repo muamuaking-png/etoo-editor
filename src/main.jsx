@@ -1,42 +1,33 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createStore } from 'polotno/model/store';
-import {
-  PolotnoContainer,
-  SidePanelWrap,
-  WorkspaceWrap,
-} from 'polotno/component/polotno-container';
+import { PolotnoContainer, SidePanelWrap, WorkspaceWrap } from 'polotno';
 import { SidePanel } from 'polotno/side-panel';
-import { Workspace } from 'polotno/component/workspace';
+import { Workspace } from 'polotno/workspace';
 import { Toolbar } from 'polotno/toolbar/toolbar';
 import { ZoomButtons } from 'polotno/toolbar/zoom-buttons';
+
+// 스타일 시트 (안정적인 경로)
 import '@blueprintjs/core/lib/css/blueprint.css';
 import '@blueprintjs/icons/lib/css/blueprint-icons.css';
 
 const TALLY_URL = 'https://tally.so/r/xXNz09';
 
+// 무료 키 사용
 const store = createStore({ key: 'nFA5H9elui3n', showCredit: true });
 
+// 기본 현수막 설정 (6000x900)
+store.setSize(6000, 900);
 store.addPage();
 store.pages[0].addElement({
   type: 'text',
-  x: 500, y: 300,
+  x: 3000, y: 350,
   width: 5000,
-  text: '2026년 마케팅그룹 워크샵',
+  text: '주식회사 이투 - 시안 수정 에디터',
   fontSize: 250,
   align: 'center',
-  fill: '#00c4a6',
+  fill: '#2563eb',
 });
-store.pages[0].addElement({
-  type: 'text',
-  x: 500, y: 620,
-  width: 5000,
-  text: '내용을 입력하세요',
-  fontSize: 150,
-  align: 'center',
-  fill: '#000000',
-});
-store.setSize(6000, 900);
 
 function ConfirmButton() {
   const handleClick = () => {
@@ -56,16 +47,18 @@ function ConfirmButton() {
 
 function App() {
   return (
-    <PolotnoContainer style={{ width: '100vw', height: '100vh' }}>
-      <SidePanelWrap>
-        <SidePanel store={store} />
-      </SidePanelWrap>
-      <WorkspaceWrap>
-        <Toolbar store={store} components={{ ActionControls: ConfirmButton }} />
-        <Workspace store={store} />
-        <ZoomButtons store={store} />
-      </WorkspaceWrap>
-    </PolotnoContainer>
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <PolotnoContainer>
+        <SidePanelWrap>
+          <SidePanel store={store} />
+        </SidePanelWrap>
+        <WorkspaceWrap>
+          <Toolbar store={store} components={{ ActionControls: ConfirmButton }} />
+          <Workspace store={store} />
+          <ZoomButtons store={store} />
+        </WorkspaceWrap>
+      </PolotnoContainer>
+    </div>
   );
 }
 
