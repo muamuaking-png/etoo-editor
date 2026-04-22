@@ -8,14 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "polotno": "1.3.16",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@blueprintjs/core": "^5.0.0",
-    "@blueprintjs/icons": "^5.0.0"
+    "polotno": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@blueprintjs/core": "latest",
+    "@blueprintjs/icons": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.2.0"
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest"
   }
 }
