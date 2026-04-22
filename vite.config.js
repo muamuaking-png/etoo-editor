@@ -1,0 +1,9 @@
+jsimport { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  optimizeDeps: {
+    include: ['polotno', 'react', 'react-dom'],
+  },
+});
