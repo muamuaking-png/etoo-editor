@@ -17,13 +17,13 @@ const TAG = 'etoo';
 const SHEET_ID = '16JedVrzxqrFtBaN5YANB-i-Ry-Tq252_Gf6XB4pnOpM';
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1`;
 
-// ─── 기본 시작 템플릿 ID (시트 A열 id값, 9번행) ──────────────────────────
-const DEFAULT_TEMPLATE_ID = 'tpl_009';
+// ─── 기본 시작 템플릿 ID ──────────────────────────────────────────────────
+const DEFAULT_TEMPLATE_ID = 'tpl_008';
 
 // ─── 스토어 초기화 ────────────────────────────────────────────────────────
 const store = createStore({ key: '', showCredit: true });
 
-// ─── CSV 한 줄 파싱 (따옴표 처리 포함) ───────────────────────────────────
+// ─── CSV 한 줄 파싱 ───────────────────────────────────────────────────────
 function splitCsvLine(line) {
   const cols = [];
   let cur = '', inQ = false;
@@ -43,14 +43,13 @@ function splitCsvLine(line) {
   return cols;
 }
 
-// ─── CSV 전체 파싱 (JSON 안에 줄바꿈 있을 수 있어서 행 누적 처리) ─────────
+// ─── CSV 전체 파싱 ────────────────────────────────────────────────────────
 function parseCsv(text) {
   const results = [];
   const lines = text.split('\n');
 
   for (let i = 1; i < lines.length; i++) {
     let line = lines[i];
-    // 따옴표가 홀수면 행이 아직 안 끝난 것 → 다음 줄 이어붙이기
     let quoteCount = (line.match(/"/g) || []).length;
     while (quoteCount % 2 !== 0 && i + 1 < lines.length) {
       i++;
@@ -62,13 +61,21 @@ function parseCsv(text) {
     const id = cols[0]?.replace(/^"|"$/g, '').trim();
     if (!id) continue;
 
+    // JSON 텍스트 추출 + 제어문자 제거
+    const rawJson = cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '';
+    // 줄바꿈/탭 등 제어문자를 공백으로 치환 (JSON 파싱 오류 방지)
+    const cleanJson = rawJson.replace(/[\u0000-\u001F\u007F]/g, (ch) => {
+      // JSON 에서 허용되는 이스케이프만 유지
+      const allowed = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
+      return allowed[ch] ?? ' ';
+    });
+
     results.push({
       id,
       name:      cols[1]?.replace(/^"|"$/g, '').trim() || '',
       category:  cols[2]?.replace(/^"|"$/g, '').trim() || '기타',
       thumbnail: cols[3]?.replace(/^"|"$/g, '').trim() || '',
-      // E열 = cols[4]: JSON 텍스트 (큰따옴표 이스케이프 복원)
-      json_data: cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '',
+      json_data: cleanJson,
     });
   }
   return results;
@@ -201,7 +208,7 @@ const TemplateSection = {
           </div>
         )}
 
-        {/* 템플릿 그리드 */}
+        {/* 템플릿 그리드 - 썸네일 비율 원본대로 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {filtered.map(tpl => (
             <div key={tpl.id} onClick={() => handleApply(tpl)} style={{
@@ -213,10 +220,10 @@ const TemplateSection = {
             }}>
               {tpl.thumbnail ? (
                 <img src={tpl.thumbnail} alt={tpl.name}
-                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+                  style={{ width: '100%', height: 'auto', display: 'block' }} />
               ) : (
                 <div style={{
-                  width: '100%', aspectRatio: '16/9', background: '#334155',
+                  width: '100%', height: 80, background: '#334155',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
                 }}>📄</div>
               )}
@@ -317,7 +324,7 @@ const CloudinarySection = {
   }),
 };
 
-// ─── 섹션 구성: 템플릿 맨 앞, 기존 photos → 내 사진, 나머지 기본 섹션 유지
+// ─── 섹션 구성 ───────────────────────────────────────────────────────────
 const customSections = [
   TemplateSection,
   ...DEFAULT_SECTIONS.map((s) =>
