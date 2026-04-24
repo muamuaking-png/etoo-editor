@@ -13,31 +13,58 @@ import { observer } from 'mobx-react-lite';
 const CLOUD_NAME = 'dm1rqkqbj';
 const TAG = 'etoo';
 
-// ─── 구글 시트 설정 ───────────────────────────────────────────────────────
+// ─── 구글 시트 설정 (CSV 방식) ────────────────────────────────────────────
 const SHEET_ID = '16JedVrzxqrFtBaN5YANB-i-Ry-Tq252_Gf6XB4pnOpM';
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1`;
 
-// ─── 스토어 초기화 (빈 캔버스로 시작) ────────────────────────────────────
+// ─── 9번행 기본 시작 템플릿 URL ───────────────────────────────────────────
+const DEFAULT_TEMPLATE_URL = 'https://drive.google.com/uc?export=download&id=13mYaTTJqPcRoSisfG5ZcxWdrMEYE0Z1x';
+
+// ─── 스토어 초기화 + 기본 템플릿 적용 ────────────────────────────────────
 const store = createStore({ key: '', showCredit: true });
-store.addPage();
+
+(async () => {
+  try {
+    const resp = await fetch(DEFAULT_TEMPLATE_URL);
+    if (!resp.ok) throw new Error('기본 템플릿 로드 실패');
+    const json = await resp.json();
+    store.loadJSON(json);
+  } catch (e) {
+    console.warn('기본 템플릿 로드 실패, 빈 캔버스로 시작:', e.message);
+    store.addPage();
+  }
+})();
+
+// ─── CSV 파싱 유틸 ────────────────────────────────────────────────────────
+function parseCsv(text) {
+  const lines = text.trim().split('\n');
+  return lines.slice(1).map(line => {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  }).filter(cols => cols[0]);
+}
 
 // ─── 구글 시트에서 템플릿 목록 불러오기 ──────────────────────────────────
 async function fetchTemplates() {
   const resp = await fetch(SHEET_URL);
   if (!resp.ok) throw new Error('시트 불러오기 실패: ' + resp.status);
   const text = await resp.text();
-  // 구글 시트 gviz 응답은 앞에 불필요한 문자열이 붙어 있어서 JSON만 추출
-  const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
-  const rows = json.table.rows;
-  return rows
-    .filter(r => r.c[0]?.v) // 빈 행 제거
-    .map(r => ({
-      id:        r.c[0]?.v || '',
-      name:      r.c[1]?.v || '',
-      category:  r.c[2]?.v || '기타',
-      thumbnail: r.c[3]?.v || '',
-      json_url:  r.c[4]?.v || '',
-    }));
+  const rows = parseCsv(text);
+  return rows.map(cols => ({
+    id:        cols[0] || '',
+    name:      cols[1] || '',
+    category:  cols[2] || '기타',
+    thumbnail: cols[3] || '',
+    json_url:  cols[4] || '',
+  }));
 }
 
 // ─── 템플릿 JSON 불러와서 캔버스에 적용 ──────────────────────────────────
@@ -48,13 +75,32 @@ async function applyTemplate(jsonUrl) {
   store.loadJSON(json);
 }
 
+// ─── 심플 SVG 아이콘 ─────────────────────────────────────────────────────
+const TemplateIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="9" y1="21" x2="9" y2="9"/>
+  </svg>
+);
+
+const PhotoIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+);
+
 // ─── 커스텀 "템플릿" 섹션 ────────────────────────────────────────────────
 const TemplateSection = {
   name: 'templates',
 
   Tab: (props) => (
     <SectionTab name="템플릿" {...props}>
-      <span style={{ fontSize: 22 }}>📋</span>
+      <TemplateIcon />
     </SectionTab>
   ),
 
@@ -80,10 +126,7 @@ const TemplateSection = {
 
     useEffect(() => { load(); }, []);
 
-    // 카테고리 목록 추출
     const categories = ['전체', ...new Set(templates.map(t => t.category))];
-
-    // 필터링
     const filtered = category === '전체'
       ? templates
       : templates.filter(t => t.category === category);
@@ -103,72 +146,38 @@ const TemplateSection = {
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {/* 카테고리 탭 */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 20,
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 'bold',
-                background: category === cat ? '#2563eb' : '#334155',
-                color: '#fff',
-              }}
-            >
-              {cat}
-            </button>
+            <button key={cat} onClick={() => setCategory(cat)} style={{
+              padding: '4px 10px', borderRadius: 20, border: 'none',
+              cursor: 'pointer', fontSize: 12, fontWeight: 'bold',
+              background: category === cat ? '#2563eb' : '#334155',
+              color: '#fff',
+            }}>{cat}</button>
           ))}
         </div>
 
-        {/* 에러 */}
-        {error && (
-          <div style={{ color: 'red', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
-        )}
+        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
+        {loading && <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>불러오는 중...</div>}
 
-        {/* 로딩 */}
-        {loading && (
-          <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>
-            불러오는 중...
-          </div>
-        )}
-
-        {/* 템플릿 목록 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {filtered.map(tpl => (
-            <div
-              key={tpl.id}
-              onClick={() => handleApply(tpl)}
-              style={{
-                cursor: 'pointer',
-                borderRadius: 8,
-                overflow: 'hidden',
-                border: applying === tpl.id ? '2px solid #2563eb' : '1px solid #334155',
-                background: '#1e293b',
-                opacity: applying && applying !== tpl.id ? 0.5 : 1,
-                transition: 'opacity 0.2s',
-              }}
-            >
-              {/* 썸네일 */}
+            <div key={tpl.id} onClick={() => handleApply(tpl)} style={{
+              cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
+              border: applying === tpl.id ? '2px solid #2563eb' : '1px solid #334155',
+              background: '#1e293b',
+              opacity: applying && applying !== tpl.id ? 0.5 : 1,
+              transition: 'opacity 0.2s',
+            }}>
               {tpl.thumbnail ? (
-                <img
-                  src={tpl.thumbnail}
-                  alt={tpl.name}
-                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
-                />
+                <img src={tpl.thumbnail} alt={tpl.name}
+                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
               ) : (
                 <div style={{
-                  width: '100%', aspectRatio: '16/9',
-                  background: '#334155', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 24,
+                  width: '100%', aspectRatio: '16/9', background: '#334155',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
                 }}>📄</div>
               )}
-              {/* 이름 */}
               <div style={{ padding: '6px 8px' }}>
                 <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{tpl.category}</div>
                 <div style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 'bold', lineHeight: 1.3 }}>
@@ -179,17 +188,11 @@ const TemplateSection = {
           ))}
         </div>
 
-        {/* 새로고침 */}
-        <button
-          onClick={load}
-          style={{
-            width: '100%', marginTop: 12, padding: '6px',
-            background: '#475569', color: '#fff', border: 'none',
-            borderRadius: 6, cursor: 'pointer', fontSize: 12,
-          }}
-        >
-          🔄 목록 새로고침
-        </button>
+        <button onClick={load} style={{
+          width: '100%', marginTop: 12, padding: '6px',
+          background: '#475569', color: '#fff', border: 'none',
+          borderRadius: 6, cursor: 'pointer', fontSize: 12,
+        }}>🔄 목록 새로고침</button>
       </div>
     );
   }),
@@ -217,7 +220,7 @@ const CloudinarySection = {
 
   Tab: (props) => (
     <SectionTab name="내 사진" {...props}>
-      <span style={{ fontSize: 22 }}>🖼️</span>
+      <PhotoIcon />
     </SectionTab>
   ),
 
@@ -243,20 +246,16 @@ const CloudinarySection = {
 
     const handleSelect = (img) => {
       store.activePage.addElement({
-        type:   'image',
-        src:    img.url,
-        x:      100,
-        y:      100,
-        width:  Math.min(img.width, 1200),
+        type: 'image', src: img.url,
+        x: 100, y: 100,
+        width:  Math.min(img.width,  1200),
         height: Math.min(img.height, 800),
       });
     };
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {error && (
-          <div style={{ color: 'red', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
-        )}
+        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
         <ImagesGrid
           images={images}
           getPreview={(img) => img.thumb}
@@ -264,22 +263,17 @@ const CloudinarySection = {
           onSelect={handleSelect}
           rowsNumber={2}
         />
-        <button
-          onClick={load}
-          style={{
-            width: '100%', marginTop: 8, padding: '6px',
-            background: '#475569', color: '#fff', border: 'none',
-            borderRadius: 6, cursor: 'pointer', fontSize: 12,
-          }}
-        >
-          🔄 새로고침
-        </button>
+        <button onClick={load} style={{
+          width: '100%', marginTop: 8, padding: '6px',
+          background: '#475569', color: '#fff', border: 'none',
+          borderRadius: 6, cursor: 'pointer', fontSize: 12,
+        }}>🔄 새로고침</button>
       </div>
     );
   }),
 };
 
-// ─── 섹션 구성: 템플릿 맨 앞, photos → 내 사진 교체 ─────────────────────
+// ─── 섹션 구성 ───────────────────────────────────────────────────────────
 const customSections = [
   TemplateSection,
   ...DEFAULT_SECTIONS.map((s) =>
@@ -309,7 +303,6 @@ function ConfirmButton() {
   };
 
   const handleExport = async () => {
-    // ✅ 시안 확정 전 확인창
     const ok = window.confirm(
       '이 시안으로 진행하시겠습니까?\n\n확인을 누르면 발주 폼으로 이동합니다.'
     );
