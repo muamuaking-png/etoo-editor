@@ -58,14 +58,14 @@ function parseCsv(text) {
     }
 
     const cols = splitCsvLine(line);
-    const id = cols[0]?.replace(/^"|"$/g, '').trim();
+    // splitCsvLine이 이미 CSV 언이스케이프 처리함 → 추가 replace 불필요
+    const id = cols[0]?.trim();
     if (!id) continue;
 
-    // JSON 텍스트 추출
-    const rawJson = cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '';
-    // 문자열 내부/외부를 구분해서 제어문자 처리:
-    //  - 문자열 외부: \n \r \t는 JSON 구조 공백으로 허용 → 유지, 나머지 제어문자만 제거
-    //  - 문자열 내부: 제어문자는 반드시 이스케이프해야 함 (\n → \\n 등)
+    // JSON 텍스트 추출 (splitCsvLine이 이미 "" → " 변환 완료)
+    const rawJson = cols[4]?.trim() || '';
+
+    // 문자 단위로 JSON을 순회하며 제어문자 및 따옴표 문제를 수정
     const cleanJson = (() => {
       const ESC = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
       let out = '', inStr = false, i = 0;
@@ -73,10 +73,20 @@ function parseCsv(text) {
         const ch = rawJson[i];
         if (inStr) {
           if (ch === '\\') {
+            // 이미 이스케이프된 시퀀스 → 그대로 통과
             out += ch + (rawJson[i + 1] ?? '');
             i += 2; continue;
           } else if (ch === '"') {
-            inStr = false; out += ch;
+            // 문자열을 닫는 " 인지, 이스케이프 안 된 " 인지 판별
+            // 다음 non-space 문자가 , } ] : 이면 닫는 따옴표로 판단
+            let j = i + 1;
+            while (j < rawJson.length && (rawJson[j] === ' ' || rawJson[j] === '\n' || rawJson[j] === '\r' || rawJson[j] === '\t')) j++;
+            const next = rawJson[j];
+            if (!next || next === ',' || next === '}' || next === ']' || next === ':') {
+              inStr = false; out += ch; // 닫는 따옴표
+            } else {
+              out += '\\"'; // 내부의 이스케이프 안 된 따옴표 → 이스케이프
+            }
           } else if (ch.charCodeAt(0) < 0x20) {
             // 문자열 내부 제어문자 → 이스케이프
             out += ESC[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
@@ -86,8 +96,7 @@ function parseCsv(text) {
         } else {
           if (ch === '"') { inStr = true; out += ch; }
           else if (ch.charCodeAt(0) < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t') {
-            // 문자열 외부 불필요한 제어문자 제거 (\n \r \t는 JSON 공백으로 허용)
-            out += ' ';
+            out += ' '; // 구조 위치의 제어문자 제거
           } else {
             out += ch;
           }
@@ -99,9 +108,9 @@ function parseCsv(text) {
 
     results.push({
       id,
-      name:      cols[1]?.replace(/^"|"$/g, '').trim() || '',
-      category:  cols[2]?.replace(/^"|"$/g, '').trim() || '기타',
-      thumbnail: cols[3]?.replace(/^"|"$/g, '').trim() || '',
+      name:      cols[1]?.trim() || '',
+      category:  cols[2]?.trim() || '기타',
+      thumbnail: cols[3]?.trim() || '',
       json_data: cleanJson,
     });
   }
@@ -122,6 +131,15 @@ function applyTemplate(jsonData) {
     const json = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
     store.loadJSON(json);
   } catch (e) {
+    // 파싱 실패 시 문제 위치 주변 50자를 콘솔에 출력 (디버깅용)
+    if (typeof jsonData === 'string') {
+      const match = e.message.match(/position (\d+)/);
+      if (match) {
+        const pos = parseInt(match[1]);
+        console.error('[JSON 오류] 위치:', pos,
+          '\n앞뒤 문자열:', JSON.stringify(jsonData.slice(Math.max(0, pos - 30), pos + 30)));
+      }
+    }
     throw new Error('JSON 파싱 실패: ' + e.message);
   }
 }
