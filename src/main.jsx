@@ -58,48 +58,30 @@ function parseCsv(text) {
     }
 
     const cols = splitCsvLine(line);
-    // splitCsvLine이 이미 CSV 언이스케이프 처리함 → 추가 replace 불필요
     const id = cols[0]?.trim();
     if (!id) continue;
 
-    // JSON 텍스트 추출 (splitCsvLine이 이미 "" → " 변환 완료)
     const rawJson = cols[4]?.trim() || '';
-
-    // 문자 단위로 JSON을 순회하며 제어문자 및 따옴표 문제를 수정
     const cleanJson = (() => {
       const ESC = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
       let out = '', inStr = false, i = 0;
       while (i < rawJson.length) {
         const ch = rawJson[i];
         if (inStr) {
-          if (ch === '\\') {
-            // 이미 이스케이프된 시퀀스 → 그대로 통과
-            out += ch + (rawJson[i + 1] ?? '');
-            i += 2; continue;
-          } else if (ch === '"') {
-            // 문자열을 닫는 " 인지, 이스케이프 안 된 " 인지 판별
-            // 다음 non-space 문자가 , } ] : 이면 닫는 따옴표로 판단
+          if (ch === '\\') { out += ch + (rawJson[i + 1] ?? ''); i += 2; continue; }
+          else if (ch === '"') {
             let j = i + 1;
-            while (j < rawJson.length && (rawJson[j] === ' ' || rawJson[j] === '\n' || rawJson[j] === '\r' || rawJson[j] === '\t')) j++;
+            while (j < rawJson.length && ' \n\r\t'.includes(rawJson[j])) j++;
             const next = rawJson[j];
-            if (!next || next === ',' || next === '}' || next === ']' || next === ':') {
-              inStr = false; out += ch; // 닫는 따옴표
-            } else {
-              out += '\\"'; // 내부의 이스케이프 안 된 따옴표 → 이스케이프
-            }
+            if (!next || ',}]:'.includes(next)) { inStr = false; out += ch; }
+            else { out += '\\"'; }
           } else if (ch.charCodeAt(0) < 0x20) {
-            // 문자열 내부 제어문자 → 이스케이프
             out += ESC[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
-          } else {
-            out += ch;
-          }
+          } else { out += ch; }
         } else {
           if (ch === '"') { inStr = true; out += ch; }
-          else if (ch.charCodeAt(0) < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t') {
-            out += ' '; // 구조 위치의 제어문자 제거
-          } else {
-            out += ch;
-          }
+          else if (ch.charCodeAt(0) < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t') { out += ' '; }
+          else { out += ch; }
         }
         i++;
       }
@@ -131,15 +113,6 @@ function applyTemplate(jsonData) {
     const json = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
     store.loadJSON(json);
   } catch (e) {
-    // 파싱 실패 시 문제 위치 주변 50자를 콘솔에 출력 (디버깅용)
-    if (typeof jsonData === 'string') {
-      const match = e.message.match(/position (\d+)/);
-      if (match) {
-        const pos = parseInt(match[1]);
-        console.error('[JSON 오류] 위치:', pos,
-          '\n앞뒤 문자열:', JSON.stringify(jsonData.slice(Math.max(0, pos - 30), pos + 30)));
-      }
-    }
     throw new Error('JSON 파싱 실패: ' + e.message);
   }
 }
@@ -198,95 +171,123 @@ const TemplateSection = {
     const [category, setCategory]   = useState('전체');
 
     const load = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const list = await fetchTemplates();
-        setTemplates(list);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true); setError('');
+      try { setTemplates(await fetchTemplates()); }
+      catch (e) { setError(e.message); }
+      finally { setLoading(false); }
     };
-
     useEffect(() => { load(); }, []);
-
-    const categories = ['전체', ...new Set(templates.map(t => t.category))];
-    const filtered = category === '전체'
-      ? templates
-      : templates.filter(t => t.category === category);
 
     const handleApply = async (tpl) => {
       const ok = window.confirm(`"${tpl.name}" 템플릿을 적용하시겠습니까?\n현재 작업 중인 내용이 사라집니다.`);
       if (!ok) return;
       setApplying(tpl.id);
-      try {
-        applyTemplate(tpl.json_data);
-      } catch (e) {
-        alert('템플릿 적용 실패: ' + e.message);
-      } finally {
-        setApplying('');
-      }
+      try { applyTemplate(tpl.json_data); }
+      catch (e) { alert('템플릿 적용 실패: ' + e.message); }
+      finally { setApplying(''); }
     };
+
+    // 카테고리별 픽토그램 아이콘 (라인 SVG)
+    const CAT_ICONS = {
+      '전체':  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>,
+      '배너':  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1" y="3" width="12" height="8" rx="1.2"/><line x1="4" y1="6.5" x2="10" y2="6.5"/><line x1="4" y1="8.5" x2="8" y2="8.5"/></svg>,
+      '보드':  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="1" width="10" height="12" rx="1.2"/><line x1="4.5" y1="4.5" x2="9.5" y2="4.5"/><line x1="4.5" y1="7" x2="9.5" y2="7"/><line x1="4.5" y1="9.5" x2="7.5" y2="9.5"/></svg>,
+      '현수막':<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="1" y="4" width="12" height="6" rx="1.2"/><line x1="3" y1="6.5" x2="11" y2="6.5"/><line x1="3" y1="8.5" x2="8" y2="8.5"/></svg>,
+      '기타':  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/><circle cx="11" cy="7" r="1"/></svg>,
+    };
+    const getIcon = (cat) => CAT_ICONS[cat] || CAT_ICONS['기타'];
+
+    const categories = ['전체', ...new Set(templates.map(t => t.category))];
+    const filtered = category === '전체' ? templates : templates.filter(t => t.category === category);
+    // 현수막 카테고리는 1열, 나머지는 2열
+    const isWide = (tpl) => tpl.category === '현수막';
+    const wideItems   = filtered.filter(isWide);
+    const normalItems = filtered.filter(t => !isWide(t));
+
+    // SVG 새로고침 아이콘 (라인)
+    const RefreshIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }}>
+        <path d="M12 7A5 5 0 1 1 9.5 2.5"/>
+        <polyline points="9.5 1 9.5 3.5 12 3.5"/>
+      </svg>
+    );
+
+    const TplCard = ({ tpl, fullWidth }) => (
+      <div onClick={() => handleApply(tpl)} style={{
+        cursor: 'pointer', borderRadius: 7, overflow: 'hidden',
+        border: applying === tpl.id ? '2px solid #3b82f6' : '1px solid #2d3748',
+        background: '#1a2236',
+        opacity: applying && applying !== tpl.id ? 0.45 : 1,
+        transition: 'opacity 0.15s, border-color 0.15s',
+      }}>
+        {tpl.thumbnail ? (
+          <img src={tpl.thumbnail} alt={tpl.name} style={{ width: '100%', height: 'auto', display: 'block' }} />
+        ) : (
+          <div style={{ width: '100%', height: fullWidth ? 60 : 80, background: '#2d3748',
+            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.4">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </div>
+        )}
+        <div style={{ padding: '5px 7px' }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 1 }}>{tpl.category}</div>
+          <div style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600, lineHeight: 1.3 }}>
+            {applying === tpl.id ? '적용 중…' : tpl.name}
+          </div>
+        </div>
+      </div>
+    );
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {/* 카테고리 필터 */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} style={{
-              padding: '4px 10px', borderRadius: 20, border: 'none',
-              cursor: 'pointer', fontSize: 12, fontWeight: 'bold',
-              background: category === cat ? '#2563eb' : '#334155',
-              color: '#fff',
-            }}>{cat}</button>
-          ))}
+
+        {/* 카테고리 필터 — 픽토그램 + 텍스트 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+          {categories.map(cat => {
+            const active = category === cat;
+            return (
+              <button key={cat} onClick={() => setCategory(cat)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 20,
+                border: active ? '1.5px solid #3b82f6' : '1.5px solid transparent',
+                background: active ? 'rgba(59,130,246,0.15)' : '#1e293b',
+                color: active ? '#93c5fd' : '#94a3b8',
+                cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                transition: 'all 0.15s',
+              }}>
+                {getIcon(cat)}{cat}
+              </button>
+            );
+          })}
         </div>
 
-        {error && (
-          <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
-        )}
-        {loading && (
-          <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>
-            불러오는 중...
+        {error && <div style={{ color: '#f87171', padding: '6px 8px', fontSize: 11, background: 'rgba(248,113,113,0.08)', borderRadius: 6, marginBottom: 8 }}>⚠ {error}</div>}
+        {loading && <div style={{ color: '#64748b', padding: 8, fontSize: 12, textAlign: 'center' }}>불러오는 중…</div>}
+
+        {/* 가로형(현수막) - 1열 */}
+        {wideItems.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: normalItems.length > 0 ? 10 : 0 }}>
+            {wideItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} fullWidth />)}
           </div>
         )}
 
-        {/* 템플릿 그리드 - 썸네일 비율 원본대로 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {filtered.map(tpl => (
-            <div key={tpl.id} onClick={() => handleApply(tpl)} style={{
-              cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
-              border: applying === tpl.id ? '2px solid #2563eb' : '1px solid #334155',
-              background: '#1e293b',
-              opacity: applying && applying !== tpl.id ? 0.5 : 1,
-              transition: 'opacity 0.2s',
-            }}>
-              {tpl.thumbnail ? (
-                <img src={tpl.thumbnail} alt={tpl.name}
-                  style={{ width: '100%', height: 'auto', display: 'block' }} />
-              ) : (
-                <div style={{
-                  width: '100%', height: 80, background: '#334155',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
-                }}>📄</div>
-              )}
-              <div style={{ padding: '6px 8px' }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{tpl.category}</div>
-                <div style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 'bold', lineHeight: 1.3 }}>
-                  {applying === tpl.id ? '적용 중...' : tpl.name}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* 일반형 - 2열 */}
+        {normalItems.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {normalItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} />)}
+          </div>
+        )}
 
         <button onClick={load} style={{
-          width: '100%', marginTop: 12, padding: '6px',
-          background: '#475569', color: '#fff', border: 'none',
-          borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>🔄 목록 새로고침</button>
+          width: '100%', marginTop: 12, padding: '7px',
+          background: '#1e293b', color: '#94a3b8',
+          border: '1px solid #2d3748', borderRadius: 6,
+          cursor: 'pointer', fontSize: 11, fontWeight: 500,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <RefreshIcon />목록 새로고침
+        </button>
       </div>
     );
   }),
@@ -372,9 +373,9 @@ const CloudinarySection = {
 // ─── 섹션 구성 ───────────────────────────────────────────────────────────
 const customSections = [
   TemplateSection,
-  ...DEFAULT_SECTIONS.map((s) =>
-    s.name === 'photos' ? CloudinarySection : s
-  ),
+  ...DEFAULT_SECTIONS
+    .filter(s => s.name !== 'templates')   // 기본 템플릿 섹션 제거
+    .map(s => s.name === 'photos' ? CloudinarySection : s),
 ];
 
 // ─── 확정 / JSON 버튼 ────────────────────────────────────────────────────
