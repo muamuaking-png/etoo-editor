@@ -13,397 +13,187 @@ import { observer } from 'mobx-react-lite';
 const CLOUD_NAME = 'dm1rqkqbj';
 const TAG = 'etoo';
 
-// ─── 내 디자인 JSON ───────────────────────────────────────────────────────
-const MY_DESIGN = {
-  "width": 6000,
-  "height": 900,
-  "fonts": [],
-  "pages": [
-    {
-      "id": "U17BguN1hT",
-      "children": [
-        {
-          "id": "_9uo86pX0K",
-          "type": "text",
-          "name": "text-1",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": -29.256080114448956,
-          "y": 209.5,
-          "width": 3600,
-          "height": 481,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 5.557506966084132,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "text": "기분좋은",
-          "placeholder": "",
-          "fontSize": 400,
-          "fontFamily": "Roboto",
-          "fontStyle": "normal",
-          "fontWeight": "bold",
-          "textDecoration": "",
-          "textTransform": "none",
-          "fill": "rgba(0,174,176,1)",
-          "align": "center",
-          "verticalAlign": "top",
-          "strokeWidth": 0,
-          "stroke": "black",
-          "lineHeight": 1.2,
-          "letterSpacing": 0,
-          "backgroundEnabled": false,
-          "backgroundColor": "#7ED321",
-          "backgroundOpacity": 1,
-          "backgroundCornerRadius": 0.5,
-          "backgroundPadding": 0.5,
-          "curveEnabled": false,
-          "curvePower": 0.5
-        },
-        {
-          "id": "qYeuygnFaC",
-          "type": "image",
-          "name": "image-1",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 5149.999999999975,
-          "y": 7.52091131229497e-12,
-          "width": 849.9999999999939,
-          "height": 899.9999999999924,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 5,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "src": "https://res.cloudinary.com/dm1rqkqbj/image/upload/imbank1_zoin1a.svg",
-          "cropX": 0,
-          "cropY": 0,
-          "cropWidth": 1,
-          "cropHeight": 0.9999999999999988,
-          "cornerRadius": 0,
-          "flipX": false,
-          "flipY": false,
-          "clipSrc": "",
-          "borderColor": "black",
-          "borderSize": 0,
-          "keepRatio": false,
-          "stretchEnabled": false
-        },
-        {
-          "id": "mW_0mp33-0",
-          "type": "image",
-          "name": "image-2",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 5016.817678812406,
-          "y": 81.8306239343633,
-          "width": 684.8990593850191,
-          "height": 887.5683865754152,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 5,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "src": "https://res.cloudinary.com/dm1rqkqbj/image/upload/단디_ldthn2.png",
-          "cropX": 0,
-          "cropY": 0,
-          "cropWidth": 0.9999999999999991,
-          "cropHeight": 0.884609264758112,
-          "cornerRadius": 0,
-          "flipX": false,
-          "flipY": false,
-          "clipSrc": "",
-          "borderColor": "black",
-          "borderSize": 0,
-          "keepRatio": false,
-          "stretchEnabled": false
-        },
-        {
-          "id": "S28cpJSgC2",
-          "type": "image",
-          "name": "image-3",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 105.72246065808261,
-          "y": 81.83062393436322,
-          "width": 574.1834090257108,
-          "height": 99.62999791313719,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 5,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "src": "https://res.cloudinary.com/dm1rqkqbj/image/upload/imbank_logo1_ohtges.svg",
-          "cropX": 0,
-          "cropY": 0,
-          "cropWidth": 0.9999999999999986,
-          "cropHeight": 1,
-          "cornerRadius": 0,
-          "flipX": false,
-          "flipY": false,
-          "clipSrc": "",
-          "borderColor": "black",
-          "borderSize": 0,
-          "keepRatio": false,
-          "stretchEnabled": false
-        },
-        {
-          "id": "jALLjBphEd",
-          "type": "text",
-          "name": "text-1",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 1814.7711015736493,
-          "y": 209.50000000000364,
-          "width": 3600,
-          "height": 481,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 5,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "text": "금융의 등장",
-          "placeholder": "",
-          "fontSize": 400,
-          "fontFamily": "Roboto",
-          "fontStyle": "normal",
-          "fontWeight": "bold",
-          "textDecoration": "",
-          "textTransform": "none",
-          "fill": "rgba(93,93,93,1)",
-          "align": "center",
-          "verticalAlign": "top",
-          "strokeWidth": 0,
-          "stroke": "black",
-          "lineHeight": 1.2,
-          "letterSpacing": 0,
-          "backgroundEnabled": false,
-          "backgroundColor": "#7ED321",
-          "backgroundOpacity": 1,
-          "backgroundCornerRadius": 0.5,
-          "backgroundPadding": 0.5,
-          "curveEnabled": false,
-          "curvePower": 0.5
-        },
-        {
-          "id": "rz_xbU6I4f",
-          "type": "text",
-          "name": "text-1",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 2376.7510729613728,
-          "y": 746.0575926154934,
-          "width": 649,
-          "height": 82,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 0.9528318910735194,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "text": "20XX . 10 . 21",
-          "placeholder": "",
-          "fontSize": 67,
-          "fontFamily": "Roboto",
-          "fontStyle": "normal",
-          "fontWeight": "bold",
-          "textDecoration": "",
-          "textTransform": "none",
-          "fill": "rgba(0,174,176,1)",
-          "align": "center",
-          "verticalAlign": "top",
-          "strokeWidth": 0,
-          "stroke": "black",
-          "lineHeight": 1.2,
-          "letterSpacing": 0,
-          "backgroundEnabled": false,
-          "backgroundColor": "#7ED321",
-          "backgroundOpacity": 1,
-          "backgroundCornerRadius": 0.5,
-          "backgroundPadding": 0.5,
-          "curveEnabled": false,
-          "curvePower": 0.5
-        },
-        {
-          "id": "h21McJOL0k",
-          "type": "text",
-          "name": "text-1",
-          "opacity": 1,
-          "visible": true,
-          "selectable": true,
-          "removable": true,
-          "alwaysOnTop": false,
-          "showInExport": true,
-          "x": 2921.743919885551,
-          "y": 746.0575926154934,
-          "width": 649,
-          "height": 82,
-          "rotation": 0,
-          "animations": [],
-          "blurEnabled": false,
-          "blurRadius": 10,
-          "brightnessEnabled": false,
-          "brightness": 0,
-          "sepiaEnabled": false,
-          "grayscaleEnabled": false,
-          "filters": {},
-          "shadowEnabled": false,
-          "shadowBlur": 0.9528318910735194,
-          "shadowOffsetX": 0,
-          "shadowOffsetY": 0,
-          "shadowColor": "black",
-          "shadowOpacity": 1,
-          "draggable": true,
-          "resizable": true,
-          "contentEditable": true,
-          "styleEditable": true,
-          "text": "iM뱅크 테스트부",
-          "placeholder": "",
-          "fontSize": 67,
-          "fontFamily": "Roboto",
-          "fontStyle": "normal",
-          "fontWeight": "bold",
-          "textDecoration": "",
-          "textTransform": "none",
-          "fill": "rgba(87,87,87,1)",
-          "align": "center",
-          "verticalAlign": "top",
-          "strokeWidth": 0,
-          "stroke": "black",
-          "lineHeight": 1.2,
-          "letterSpacing": 0,
-          "backgroundEnabled": false,
-          "backgroundColor": "#7ED321",
-          "backgroundOpacity": 1,
-          "backgroundCornerRadius": 0.5,
-          "backgroundPadding": 0.5,
-          "curveEnabled": false,
-          "curvePower": 0.5
-        }
-      ],
-      "width": "auto",
-      "height": "auto",
-      "background": "white",
-      "bleed": 0,
-      "duration": 5000
-    }
-  ],
-  "audios": [],
-  "unit": "px",
-  "dpi": 72,
-  "schemaVersion": 3
-};
+// ─── 구글 시트 설정 ───────────────────────────────────────────────────────
+const SHEET_ID = '16JedVrzxqrFtBaN5YANB-i-Ry-Tq252_Gf6XB4pnOpM';
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
 
-// ─── 스토어 초기화 (내 디자인으로 시작) ──────────────────────────────────
+// ─── 스토어 초기화 (빈 캔버스로 시작) ────────────────────────────────────
 const store = createStore({ key: '', showCredit: true });
-store.loadJSON(MY_DESIGN); // ✅ 여기가 핵심!
+store.addPage();
+
+// ─── 구글 시트에서 템플릿 목록 불러오기 ──────────────────────────────────
+async function fetchTemplates() {
+  const resp = await fetch(SHEET_URL);
+  if (!resp.ok) throw new Error('시트 불러오기 실패: ' + resp.status);
+  const text = await resp.text();
+  // 구글 시트 gviz 응답은 앞에 불필요한 문자열이 붙어 있어서 JSON만 추출
+  const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
+  const rows = json.table.rows;
+  return rows
+    .filter(r => r.c[0]?.v) // 빈 행 제거
+    .map(r => ({
+      id:        r.c[0]?.v || '',
+      name:      r.c[1]?.v || '',
+      category:  r.c[2]?.v || '기타',
+      thumbnail: r.c[3]?.v || '',
+      json_url:  r.c[4]?.v || '',
+    }));
+}
+
+// ─── 템플릿 JSON 불러와서 캔버스에 적용 ──────────────────────────────────
+async function applyTemplate(jsonUrl) {
+  const resp = await fetch(jsonUrl);
+  if (!resp.ok) throw new Error('템플릿 파일 불러오기 실패');
+  const json = await resp.json();
+  store.loadJSON(json);
+}
+
+// ─── 커스텀 "템플릿" 섹션 ────────────────────────────────────────────────
+const TemplateSection = {
+  name: 'templates',
+
+  Tab: (props) => (
+    <SectionTab name="템플릿" {...props}>
+      <span style={{ fontSize: 22 }}>📋</span>
+    </SectionTab>
+  ),
+
+  Panel: observer(({ store }) => {
+    const [templates, setTemplates] = useState([]);
+    const [loading, setLoading]     = useState(false);
+    const [applying, setApplying]   = useState('');
+    const [error, setError]         = useState('');
+    const [category, setCategory]   = useState('전체');
+
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const list = await fetchTemplates();
+        setTemplates(list);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    useEffect(() => { load(); }, []);
+
+    // 카테고리 목록 추출
+    const categories = ['전체', ...new Set(templates.map(t => t.category))];
+
+    // 필터링
+    const filtered = category === '전체'
+      ? templates
+      : templates.filter(t => t.category === category);
+
+    const handleApply = async (tpl) => {
+      const ok = window.confirm(`"${tpl.name}" 템플릿을 적용하시겠습니까?\n현재 작업 중인 내용이 사라집니다.`);
+      if (!ok) return;
+      setApplying(tpl.id);
+      try {
+        await applyTemplate(tpl.json_url);
+      } catch (e) {
+        alert('템플릿 적용 실패: ' + e.message);
+      } finally {
+        setApplying('');
+      }
+    };
+
+    return (
+      <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
+        {/* 카테고리 탭 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 20,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 'bold',
+                background: category === cat ? '#2563eb' : '#334155',
+                color: '#fff',
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* 에러 */}
+        {error && (
+          <div style={{ color: 'red', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
+        )}
+
+        {/* 로딩 */}
+        {loading && (
+          <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>
+            불러오는 중...
+          </div>
+        )}
+
+        {/* 템플릿 목록 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {filtered.map(tpl => (
+            <div
+              key={tpl.id}
+              onClick={() => handleApply(tpl)}
+              style={{
+                cursor: 'pointer',
+                borderRadius: 8,
+                overflow: 'hidden',
+                border: applying === tpl.id ? '2px solid #2563eb' : '1px solid #334155',
+                background: '#1e293b',
+                opacity: applying && applying !== tpl.id ? 0.5 : 1,
+                transition: 'opacity 0.2s',
+              }}
+            >
+              {/* 썸네일 */}
+              {tpl.thumbnail ? (
+                <img
+                  src={tpl.thumbnail}
+                  alt={tpl.name}
+                  style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div style={{
+                  width: '100%', aspectRatio: '16/9',
+                  background: '#334155', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 24,
+                }}>📄</div>
+              )}
+              {/* 이름 */}
+              <div style={{ padding: '6px 8px' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{tpl.category}</div>
+                <div style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 'bold', lineHeight: 1.3 }}>
+                  {applying === tpl.id ? '적용 중...' : tpl.name}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 새로고침 */}
+        <button
+          onClick={load}
+          style={{
+            width: '100%', marginTop: 12, padding: '6px',
+            background: '#475569', color: '#fff', border: 'none',
+            borderRadius: 6, cursor: 'pointer', fontSize: 12,
+          }}
+        >
+          🔄 목록 새로고침
+        </button>
+      </div>
+    );
+  }),
+};
 
 // ─── Cloudinary 이미지 목록 불러오기 ─────────────────────────────────────
 async function fetchCloudinaryImages() {
@@ -489,10 +279,13 @@ const CloudinarySection = {
   }),
 };
 
-// ─── photos 섹션을 내 섹션으로 교체 ──────────────────────────────────────
-const customSections = DEFAULT_SECTIONS.map((s) =>
-  s.name === 'photos' ? CloudinarySection : s
-);
+// ─── 섹션 구성: 템플릿 맨 앞, photos → 내 사진 교체 ─────────────────────
+const customSections = [
+  TemplateSection,
+  ...DEFAULT_SECTIONS.map((s) =>
+    s.name === 'photos' ? CloudinarySection : s
+  ),
+];
 
 // ─── 확정 / JSON 버튼 ────────────────────────────────────────────────────
 function ConfirmButton() {
@@ -514,7 +307,14 @@ function ConfirmButton() {
     a.download = `etoo_design_${Date.now()}.json`;
     a.click();
   };
+
   const handleExport = async () => {
+    // ✅ 시안 확정 전 확인창
+    const ok = window.confirm(
+      '이 시안으로 진행하시겠습니까?\n\n확인을 누르면 발주 폼으로 이동합니다.'
+    );
+    if (!ok) return;
+
     setLoading(true);
     try {
       const dataUrl = await store.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
