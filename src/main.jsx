@@ -61,10 +61,41 @@ function parseCsv(text) {
     const id = cols[0]?.replace(/^"|"$/g, '').trim();
     if (!id) continue;
 
-    // JSON 텍스트 추출 + 제어문자 제거
+    // JSON 텍스트 추출
     const rawJson = cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '';
-    // \t \n \r은 JSON 구조 공백으로 허용 → 유지, 나머지 제어문자만 공백으로 대체
-    const cleanJson = rawJson.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ');
+    // 문자열 내부/외부를 구분해서 제어문자 처리:
+    //  - 문자열 외부: \n \r \t는 JSON 구조 공백으로 허용 → 유지, 나머지 제어문자만 제거
+    //  - 문자열 내부: 제어문자는 반드시 이스케이프해야 함 (\n → \\n 등)
+    const cleanJson = (() => {
+      const ESC = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
+      let out = '', inStr = false, i = 0;
+      while (i < rawJson.length) {
+        const ch = rawJson[i];
+        if (inStr) {
+          if (ch === '\\') {
+            out += ch + (rawJson[i + 1] ?? '');
+            i += 2; continue;
+          } else if (ch === '"') {
+            inStr = false; out += ch;
+          } else if (ch.charCodeAt(0) < 0x20) {
+            // 문자열 내부 제어문자 → 이스케이프
+            out += ESC[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
+          } else {
+            out += ch;
+          }
+        } else {
+          if (ch === '"') { inStr = true; out += ch; }
+          else if (ch.charCodeAt(0) < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t') {
+            // 문자열 외부 불필요한 제어문자 제거 (\n \r \t는 JSON 공백으로 허용)
+            out += ' ';
+          } else {
+            out += ch;
+          }
+        }
+        i++;
+      }
+      return out;
+    })();
 
     results.push({
       id,
