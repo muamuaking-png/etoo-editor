@@ -63,12 +63,8 @@ function parseCsv(text) {
 
     // JSON 텍스트 추출 + 제어문자 제거
     const rawJson = cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '';
-    // 줄바꿈/탭 등 제어문자를 공백으로 치환 (JSON 파싱 오류 방지)
-    const cleanJson = rawJson.replace(/[\u0000-\u001F\u007F]/g, (ch) => {
-      // JSON 에서 허용되는 이스케이프만 유지
-      const allowed = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
-      return allowed[ch] ?? ' ';
-    });
+    // \t \n \r은 JSON 구조 공백으로 허용 → 유지, 나머지 제어문자만 공백으로 대체
+    const cleanJson = rawJson.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ');
 
     results.push({
       id,
