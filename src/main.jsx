@@ -13,43 +13,65 @@ import { observer } from 'mobx-react-lite';
 const CLOUD_NAME = 'dm1rqkqbj';
 const TAG = 'etoo';
 
-// ─── 구글 시트 설정 (CSV 방식) ────────────────────────────────────────────
+// ─── 구글 시트 설정 (CSV) ─────────────────────────────────────────────────
 const SHEET_ID = '16JedVrzxqrFtBaN5YANB-i-Ry-Tq252_Gf6XB4pnOpM';
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1`;
 
-// ─── 9번행 기본 시작 템플릿 URL ───────────────────────────────────────────
-const DEFAULT_TEMPLATE_URL = 'https://drive.google.com/uc?export=download&id=13mYaTTJqPcRoSisfG5ZcxWdrMEYE0Z1x';
+// ─── 기본 시작 템플릿 ID (시트 A열 id값, 9번행) ──────────────────────────
+const DEFAULT_TEMPLATE_ID = 'tpl_009';
 
-// ─── 스토어 초기화 + 기본 템플릿 적용 ────────────────────────────────────
+// ─── 스토어 초기화 ────────────────────────────────────────────────────────
 const store = createStore({ key: '', showCredit: true });
 
-(async () => {
-  try {
-    const resp = await fetch(DEFAULT_TEMPLATE_URL);
-    if (!resp.ok) throw new Error('기본 템플릿 로드 실패');
-    const json = await resp.json();
-    store.loadJSON(json);
-  } catch (e) {
-    console.warn('기본 템플릿 로드 실패, 빈 캔버스로 시작:', e.message);
-    store.addPage();
-  }
-})();
-
-// ─── CSV 파싱 유틸 ────────────────────────────────────────────────────────
-function parseCsv(text) {
-  const lines = text.trim().split('\n');
-  return lines.slice(1).map(line => {
-    const cols = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
+// ─── CSV 한 줄 파싱 (따옴표 처리 포함) ───────────────────────────────────
+function splitCsvLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQ = !inQ; }
+    } else if (ch === ',' && !inQ) {
+      cols.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
     }
-    cols.push(cur.trim());
-    return cols;
-  }).filter(cols => cols[0]);
+  }
+  cols.push(cur);
+  return cols;
+}
+
+// ─── CSV 전체 파싱 (JSON 안에 줄바꿈 있을 수 있어서 행 누적 처리) ─────────
+function parseCsv(text) {
+  const results = [];
+  const lines = text.split('\n');
+
+  for (let i = 1; i < lines.length; i++) {
+    let line = lines[i];
+    // 따옴표가 홀수면 행이 아직 안 끝난 것 → 다음 줄 이어붙이기
+    let quoteCount = (line.match(/"/g) || []).length;
+    while (quoteCount % 2 !== 0 && i + 1 < lines.length) {
+      i++;
+      line += '\n' + lines[i];
+      quoteCount = (line.match(/"/g) || []).length;
+    }
+
+    const cols = splitCsvLine(line);
+    const id = cols[0]?.replace(/^"|"$/g, '').trim();
+    if (!id) continue;
+
+    results.push({
+      id,
+      name:      cols[1]?.replace(/^"|"$/g, '').trim() || '',
+      category:  cols[2]?.replace(/^"|"$/g, '').trim() || '기타',
+      thumbnail: cols[3]?.replace(/^"|"$/g, '').trim() || '',
+      // E열 = cols[4]: JSON 텍스트 (큰따옴표 이스케이프 복원)
+      json_data: cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '',
+    });
+  }
+  return results;
 }
 
 // ─── 구글 시트에서 템플릿 목록 불러오기 ──────────────────────────────────
@@ -57,23 +79,35 @@ async function fetchTemplates() {
   const resp = await fetch(SHEET_URL);
   if (!resp.ok) throw new Error('시트 불러오기 실패: ' + resp.status);
   const text = await resp.text();
-  const rows = parseCsv(text);
-  return rows.map(cols => ({
-    id:        cols[0] || '',
-    name:      cols[1] || '',
-    category:  cols[2] || '기타',
-    thumbnail: cols[3] || '',
-    json_url:  cols[4] || '',
-  }));
+  return parseCsv(text);
 }
 
-// ─── 템플릿 JSON 불러와서 캔버스에 적용 ──────────────────────────────────
-async function applyTemplate(jsonUrl) {
-  const resp = await fetch(jsonUrl);
-  if (!resp.ok) throw new Error('템플릿 파일 불러오기 실패');
-  const json = await resp.json();
-  store.loadJSON(json);
+// ─── 템플릿 캔버스에 적용 ────────────────────────────────────────────────
+function applyTemplate(jsonData) {
+  try {
+    const json = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+    store.loadJSON(json);
+  } catch (e) {
+    throw new Error('JSON 파싱 실패: ' + e.message);
+  }
 }
+
+// ─── 앱 시작 시 기본 템플릿 로드 ─────────────────────────────────────────
+async function loadDefaultTemplate() {
+  try {
+    const list = await fetchTemplates();
+    const def = list.find(t => t.id === DEFAULT_TEMPLATE_ID);
+    if (def && def.json_data) {
+      applyTemplate(def.json_data);
+    } else {
+      store.addPage();
+    }
+  } catch (e) {
+    console.warn('기본 템플릿 로드 실패, 빈 캔버스로 시작:', e.message);
+    store.addPage();
+  }
+}
+loadDefaultTemplate();
 
 // ─── 심플 SVG 아이콘 ─────────────────────────────────────────────────────
 const TemplateIcon = () => (
@@ -136,7 +170,7 @@ const TemplateSection = {
       if (!ok) return;
       setApplying(tpl.id);
       try {
-        await applyTemplate(tpl.json_url);
+        applyTemplate(tpl.json_data);
       } catch (e) {
         alert('템플릿 적용 실패: ' + e.message);
       } finally {
@@ -146,6 +180,7 @@ const TemplateSection = {
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
+        {/* 카테고리 필터 */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setCategory(cat)} style={{
@@ -157,9 +192,16 @@ const TemplateSection = {
           ))}
         </div>
 
-        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
-        {loading && <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>불러오는 중...</div>}
+        {error && (
+          <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
+        )}
+        {loading && (
+          <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>
+            불러오는 중...
+          </div>
+        )}
 
+        {/* 템플릿 그리드 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {filtered.map(tpl => (
             <div key={tpl.id} onClick={() => handleApply(tpl)} style={{
@@ -255,7 +297,9 @@ const CloudinarySection = {
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
+        {error && (
+          <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
+        )}
         <ImagesGrid
           images={images}
           getPreview={(img) => img.thumb}
@@ -273,7 +317,7 @@ const CloudinarySection = {
   }),
 };
 
-// ─── 섹션 구성 ───────────────────────────────────────────────────────────
+// ─── 섹션 구성: 템플릿 맨 앞, 기존 photos → 내 사진, 나머지 기본 섹션 유지
 const customSections = [
   TemplateSection,
   ...DEFAULT_SECTIONS.map((s) =>
