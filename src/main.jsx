@@ -32,12 +32,8 @@ function splitCsvLine(line) {
     if (ch === '"') {
       if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
       else { inQ = !inQ; }
-    } else if (ch === ',' && !inQ) {
-      cols.push(cur);
-      cur = '';
-    } else {
-      cur += ch;
-    }
+    } else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else { cur += ch; }
   }
   cols.push(cur);
   return cols;
@@ -47,7 +43,6 @@ function splitCsvLine(line) {
 function parseCsv(text) {
   const results = [];
   const lines = text.split('\n');
-
   for (let i = 1; i < lines.length; i++) {
     let line = lines[i];
     let quoteCount = (line.match(/"/g) || []).length;
@@ -56,11 +51,9 @@ function parseCsv(text) {
       line += '\n' + lines[i];
       quoteCount = (line.match(/"/g) || []).length;
     }
-
     const cols = splitCsvLine(line);
     const id = cols[0]?.trim();
     if (!id) continue;
-
     const rawJson = cols[4]?.trim() || '';
     const cleanJson = (() => {
       const ESC = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
@@ -87,7 +80,6 @@ function parseCsv(text) {
       }
       return out;
     })();
-
     results.push({
       id,
       name:      cols[1]?.trim() || '',
@@ -122,17 +114,91 @@ async function loadDefaultTemplate() {
   try {
     const list = await fetchTemplates();
     const def = list.find(t => t.id === DEFAULT_TEMPLATE_ID);
-    if (def && def.json_data) {
-      applyTemplate(def.json_data);
-    } else {
-      store.addPage();
-    }
+    if (def && def.json_data) applyTemplate(def.json_data);
+    else store.addPage();
   } catch (e) {
     console.warn('기본 템플릿 로드 실패, 빈 캔버스로 시작:', e.message);
     store.addPage();
   }
 }
 loadDefaultTemplate();
+
+// ─── 캔버스 사이즈 변경 + 요소 자동 스케일 ───────────────────────────────
+function resizeCanvas(newW, newH) {
+  const page = store.activePage;
+  if (!page) return;
+  const oldW = store.width;
+  const oldH = store.height;
+  if (oldW === newW && oldH === newH) return;
+  const scaleX = newW / oldW;
+  const scaleY = newH / oldH;
+  page.children.forEach(el => {
+    el.set({
+      x:      el.x      * scaleX,
+      y:      el.y      * scaleY,
+      width:  el.width  * scaleX,
+      height: el.height * scaleY,
+      ...(el.type === 'text' ? { fontSize: Math.round(el.fontSize * Math.min(scaleX, scaleY)) } : {}),
+    });
+  });
+  store.setSize(newW, newH);
+}
+
+// ─── 사이즈 입력 컴포넌트 ────────────────────────────────────────────────
+const SizeInput = observer(() => {
+  const [w, setW] = useState(store.width || 6000);
+  const [h, setH] = useState(store.height || 900);
+
+  useEffect(() => {
+    setW(store.width);
+    setH(store.height);
+  }, [store.width, store.height]);
+
+  const handleApply = () => {
+    const nw = parseInt(w);
+    const nh = parseInt(h);
+    if (!nw || !nh || nw < 100 || nh < 100) {
+      alert('최소 100 이상의 값을 입력해주세요.');
+      return;
+    }
+    resizeCanvas(nw, nh);
+  };
+
+  const inputStyle = {
+    width: 72, padding: '4px 6px', borderRadius: 5,
+    border: '1px solid #334155', fontSize: 12,
+    textAlign: 'center', background: '#1e293b', color: '#f1f5f9',
+    outline: 'none',
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 6px' }}>
+      <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginRight: 2 }}>사이즈</span>
+      <input
+        type="number" value={w}
+        onChange={e => setW(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleApply()}
+        style={inputStyle} min={100}
+        placeholder="가로"
+      />
+      <span style={{ fontSize: 11, color: '#64748b' }}>×</span>
+      <input
+        type="number" value={h}
+        onChange={e => setH(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleApply()}
+        style={inputStyle} min={100}
+        placeholder="세로"
+      />
+      <span style={{ fontSize: 11, color: '#64748b' }}>mm</span>
+      <button onClick={handleApply} style={{
+        padding: '4px 10px', borderRadius: 5,
+        background: '#2563eb', color: '#fff',
+        border: 'none', cursor: 'pointer',
+        fontSize: 11, fontWeight: 700,
+      }}>적용</button>
+    </div>
+  );
+});
 
 // ─── 심플 SVG 아이콘 ─────────────────────────────────────────────────────
 const TemplateIcon = () => (
@@ -156,13 +222,9 @@ const PhotoIcon = () => (
 // ─── 커스텀 "템플릿" 섹션 ────────────────────────────────────────────────
 const TemplateSection = {
   name: 'templates',
-
   Tab: (props) => (
-    <SectionTab name="템플릿" {...props}>
-      <TemplateIcon />
-    </SectionTab>
+    <SectionTab name="템플릿" {...props}><TemplateIcon /></SectionTab>
   ),
-
   Panel: observer(({ store }) => {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading]     = useState(false);
@@ -178,7 +240,6 @@ const TemplateSection = {
     };
     useEffect(() => { load(); }, []);
 
-    // 경고창 없이 바로 적용
     const handleApply = async (tpl) => {
       setApplying(tpl.id);
       try { applyTemplate(tpl.json_data); }
@@ -186,7 +247,6 @@ const TemplateSection = {
       finally { setApplying(''); }
     };
 
-    // 카테고리별 픽토그램 (라인 SVG, 흰색)
     const CAT_ICONS = {
       '전체':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>,
       '배너':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="1" y="3" width="12" height="8" rx="1.2"/><line x1="4" y1="6.5" x2="10" y2="6.5"/><line x1="4" y1="8.5" x2="8" y2="8.5"/></svg>,
@@ -239,7 +299,6 @@ const TemplateSection = {
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {/* 카테고리 필터 */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
           {categories.map(cat => {
             const active = category === cat;
@@ -258,25 +317,20 @@ const TemplateSection = {
             );
           })}
         </div>
-
         {error && <div style={{ color:'#f87171', padding:'6px 8px', fontSize:11,
           background:'rgba(248,113,113,0.08)', borderRadius:6, marginBottom:8 }}>⚠ {error}</div>}
         {loading && <div style={{ color:'#64748b', padding:8, fontSize:12, textAlign:'center' }}>불러오는 중…</div>}
-
-        {/* 현수막(가로형) — 1열 */}
         {wideItems.length > 0 && (
           <div style={{ display:'flex', flexDirection:'column', gap:8,
             marginBottom: normalItems.length > 0 ? 10 : 0 }}>
             {wideItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} fullWidth />)}
           </div>
         )}
-        {/* 일반형 — 2열 */}
         {normalItems.length > 0 && (
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {normalItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} />)}
           </div>
         )}
-
         <button onClick={load} style={{
           width:'100%', marginTop:12, padding:'7px',
           background:'#1e293b', color:'#fff',
@@ -293,70 +347,49 @@ const TemplateSection = {
 
 // ─── Cloudinary 이미지 목록 불러오기 ─────────────────────────────────────
 async function fetchCloudinaryImages() {
-  const resp = await fetch(
-    `https://res.cloudinary.com/${CLOUD_NAME}/image/list/${TAG}.json`
-  );
+  const resp = await fetch(`https://res.cloudinary.com/${CLOUD_NAME}/image/list/${TAG}.json`);
   if (!resp.ok) throw new Error('이미지 목록 불러오기 실패: ' + resp.status);
   const data = await resp.json();
   return data.resources.map((r) => ({
-    url:    `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${r.public_id}.${r.format}`,
-    thumb:  `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_200,h_200,c_fill/${r.public_id}.${r.format}`,
-    width:  r.width,
-    height: r.height,
-    name:   r.public_id,
+    url:   `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${r.public_id}.${r.format}`,
+    thumb: `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_200,h_200,c_fill/${r.public_id}.${r.format}`,
+    width: r.width, height: r.height, name: r.public_id,
   }));
 }
 
 // ─── 커스텀 "내 사진" 섹션 ────────────────────────────────────────────────
 const CloudinarySection = {
   name: 'cloudinary-photos',
-
   Tab: (props) => (
-    <SectionTab name="내 사진" {...props}>
-      <PhotoIcon />
-    </SectionTab>
+    <SectionTab name="내 사진" {...props}><PhotoIcon /></SectionTab>
   ),
-
   Panel: observer(({ store }) => {
     const [images, setImages]   = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError]     = useState('');
 
     const load = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const imgs = await fetchCloudinaryImages();
-        setImages(imgs);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true); setError('');
+      try { setImages(await fetchCloudinaryImages()); }
+      catch (e) { setError(e.message); }
+      finally { setLoading(false); }
     };
-
     useEffect(() => { load(); }, []);
 
     const handleSelect = (img) => {
       store.activePage.addElement({
-        type: 'image', src: img.url,
-        x: 100, y: 100,
-        width:  Math.min(img.width,  1200),
-        height: Math.min(img.height, 800),
+        type: 'image', src: img.url, x: 100, y: 100,
+        width: Math.min(img.width, 1200), height: Math.min(img.height, 800),
       });
     };
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {error && (
-          <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
-        )}
+        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
         <ImagesGrid
-          images={images}
-          getPreview={(img) => img.thumb}
+          images={images} getPreview={(img) => img.thumb}
           isLoading={loading && images.length === 0}
-          onSelect={handleSelect}
-          rowsNumber={2}
+          onSelect={handleSelect} rowsNumber={2}
         />
         <button onClick={load} style={{
           width: '100%', marginTop: 8, padding: '6px',
@@ -398,8 +431,7 @@ function ConfirmButton({ onOpen }) {
 
   const btn = (bg, label, onClick, disabled = false) => (
     <button onClick={onClick} disabled={disabled} style={{
-      background: disabled ? '#888' : bg,
-      color: 'white', border: 'none',
+      background: disabled ? '#888' : bg, color: 'white', border: 'none',
       padding: '10px 16px', borderRadius: 6,
       cursor: disabled ? 'not-allowed' : 'pointer',
       fontWeight: 'bold', marginLeft: 8, fontSize: 13,
@@ -421,21 +453,21 @@ function ConfirmButton({ onOpen }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 'bold' }}>📋 JSON 코드</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                {btn('#10b981', '복사',     handleCopyJson)}
+                {btn('#10b981', '복사', handleCopyJson)}
                 {btn('#6366f1', '다운로드', handleDownloadJson)}
-                {btn('#ef4444', '닫기',     () => setShowJson(false))}
+                {btn('#ef4444', '닫기', () => setShowJson(false))}
               </div>
             </div>
             <textarea readOnly value={jsonText} style={{
-              flex: 1, minHeight: '50vh',
-              background: '#13131f', color: '#a6e3a1',
-              border: '1px solid #333', borderRadius: 6,
-              padding: 12, fontFamily: 'monospace',
-              fontSize: 12, resize: 'none', outline: 'none',
+              flex: 1, minHeight: '50vh', background: '#13131f', color: '#a6e3a1',
+              border: '1px solid #333', borderRadius: 6, padding: 12,
+              fontFamily: 'monospace', fontSize: 12, resize: 'none', outline: 'none',
             }} />
           </div>
         </div>
       )}
+      {/* ✅ 사이즈 입력창 */}
+      <SizeInput />
       {btn('#475569', '🗂️ JSON 추출', handleExportJson)}
       {btn('#2563eb', '✅ 시안확정 (발주하기)', onOpen)}
     </>
@@ -446,7 +478,7 @@ function ConfirmButton({ onOpen }) {
 const LOGO_URL = 'https://res.cloudinary.com/dm1rqkqbj/image/upload/v1776926903/%ED%9A%8C%EC%82%AC%EB%A1%9C%EA%B3%A0_tp7ewe.png';
 
 function SplashScreen({ onDone }) {
-  const [phase, setPhase] = React.useState('in'); // 'in' | 'hold' | 'out'
+  const [phase, setPhase] = React.useState('in');
   React.useEffect(() => {
     const t1 = setTimeout(() => setPhase('hold'), 800);
     const t2 = setTimeout(() => setPhase('out'),  2000);
@@ -464,7 +496,6 @@ function SplashScreen({ onDone }) {
       transition: phase === 'out' ? 'opacity 0.6s ease' : 'none',
       pointerEvents: 'none',
     }}>
-      {/* 링 이펙트 */}
       <div style={{ position: 'relative', width: 160, height: 160,
         display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
@@ -477,15 +508,12 @@ function SplashScreen({ onDone }) {
           border: '1.5px solid rgba(59,130,246,0.15)',
           animation: 'splash-ring 1.8s ease-out 0.3s infinite',
         }}/>
-        {/* 로고 */}
-        <img src={LOGO_URL} alt="logo"
-          style={{
-            width: 110, height: 110, objectFit: 'contain',
-            opacity: phase === 'in' ? 0 : 1,
-            transform: phase === 'in' ? 'scale(0.8)' : 'scale(1)',
-            transition: 'opacity 0.5s ease, transform 0.5s ease',
-          }}
-        />
+        <img src={LOGO_URL} alt="logo" style={{
+          width: 110, height: 110, objectFit: 'contain',
+          opacity: phase === 'in' ? 0 : 1,
+          transform: phase === 'in' ? 'scale(0.8)' : 'scale(1)',
+          transition: 'opacity 0.5s ease, transform 0.5s ease',
+        }}/>
       </div>
       <style>{`
         @keyframes splash-ring {
@@ -512,7 +540,10 @@ function ConfirmModal({ onConfirm, onCancel, loading }) {
         minWidth: 320, maxWidth: 400,
         animation: 'modal-in 0.25s cubic-bezier(.34,1.56,.64,1)',
       }}>
-        <style>{`@keyframes modal-in { from { opacity:0; transform:scale(.9) } to { opacity:1; transform:scale(1) } }`}</style>
+        <style>{`
+          @keyframes modal-in { from { opacity:0; transform:scale(.9) } to { opacity:1; transform:scale(1) } }
+          @keyframes spin { to { transform: rotate(360deg) } }
+        `}</style>
         <img src={LOGO_URL} alt="logo" style={{ width: 64, objectFit: 'contain', opacity: 0.9 }} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
@@ -532,7 +563,8 @@ function ConfirmModal({ onConfirm, onCancel, loading }) {
             flex: 2, padding: '11px', borderRadius: 8,
             background: loading ? '#1d4ed8' : '#2563eb',
             border: 'none', color: '#fff',
-            fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: 14, fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
             {loading
@@ -540,7 +572,6 @@ function ConfirmModal({ onConfirm, onCancel, loading }) {
               : '✅ 발주하기'}
           </button>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     </div>
   );
@@ -548,9 +579,9 @@ function ConfirmModal({ onConfirm, onCancel, loading }) {
 
 // ─── App ──────────────────────────────────────────────────────────────────
 function App() {
-  const [splash, setSplash]         = React.useState(true);
+  const [splash, setSplash]           = React.useState(true);
   const [showConfirm, setShowConfirm] = React.useState(false);
-  const [exporting, setExporting]   = React.useState(false);
+  const [exporting, setExporting]     = React.useState(false);
 
   const handleExport = async () => {
     setExporting(true);
@@ -566,8 +597,11 @@ function App() {
       const data = await resp.json();
       if (!data.secure_url) throw new Error('이미지 업로드 실패');
       const projectId = 'ETOO_' + Date.now();
+      // ✅ 캔버스 사이즈도 Tally로 전달
+      const w = store.width;
+      const h = store.height;
       window.top.location.href =
-        `https://tally.so/r/xXNz09?project_id=${projectId}&image_url=${encodeURIComponent(data.secure_url)}`;
+        `https://tally.so/r/xXNz09?project_id=${projectId}&image_url=${encodeURIComponent(data.secure_url)}&width=${w}&height=${h}`;
     } catch (err) {
       alert('시안 저장 중 문제가 생겼습니다: ' + err.message);
     } finally {
