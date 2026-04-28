@@ -32,8 +32,12 @@ function splitCsvLine(line) {
     if (ch === '"') {
       if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
       else { inQ = !inQ; }
-    } else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
-    else { cur += ch; }
+    } else if (ch === ',' && !inQ) {
+      cols.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
   }
   cols.push(cur);
   return cols;
@@ -43,6 +47,7 @@ function splitCsvLine(line) {
 function parseCsv(text) {
   const results = [];
   const lines = text.split('\n');
+
   for (let i = 1; i < lines.length; i++) {
     let line = lines[i];
     let quoteCount = (line.match(/"/g) || []).length;
@@ -51,19 +56,43 @@ function parseCsv(text) {
       line += '\n' + lines[i];
       quoteCount = (line.match(/"/g) || []).length;
     }
+
     const cols = splitCsvLine(line);
-    const id = cols[0]?.replace(/^"|"$/g, '').trim();
+    const id = cols[0]?.trim();
     if (!id) continue;
-    const rawJson = cols[4]?.replace(/^"|"$/g, '').replace(/""/g, '"').trim() || '';
-    const cleanJson = rawJson.replace(/[\u0000-\u001F\u007F]/g, (ch) => {
-      const allowed = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
-      return allowed[ch] ?? ' ';
-    });
+
+    const rawJson = cols[4]?.trim() || '';
+    const cleanJson = (() => {
+      const ESC = { '\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f' };
+      let out = '', inStr = false, i = 0;
+      while (i < rawJson.length) {
+        const ch = rawJson[i];
+        if (inStr) {
+          if (ch === '\\') { out += ch + (rawJson[i + 1] ?? ''); i += 2; continue; }
+          else if (ch === '"') {
+            let j = i + 1;
+            while (j < rawJson.length && ' \n\r\t'.includes(rawJson[j])) j++;
+            const next = rawJson[j];
+            if (!next || ',}]:'.includes(next)) { inStr = false; out += ch; }
+            else { out += '\\\"'; }
+          } else if (ch.charCodeAt(0) < 0x20) {
+            out += ESC[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
+          } else { out += ch; }
+        } else {
+          if (ch === '"') { inStr = true; out += ch; }
+          else if (ch.charCodeAt(0) < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t') { out += ' '; }
+          else { out += ch; }
+        }
+        i++;
+      }
+      return out;
+    })();
+
     results.push({
       id,
-      name:      cols[1]?.replace(/^"|"$/g, '').trim() || '',
-      category:  cols[2]?.replace(/^"|"$/g, '').trim() || '기타',
-      thumbnail: cols[3]?.replace(/^"|"$/g, '').trim() || '',
+      name:      cols[1]?.trim() || '',
+      category:  cols[2]?.trim() || '기타',
+      thumbnail: cols[3]?.trim() || '',
       json_data: cleanJson,
     });
   }
@@ -93,122 +122,17 @@ async function loadDefaultTemplate() {
   try {
     const list = await fetchTemplates();
     const def = list.find(t => t.id === DEFAULT_TEMPLATE_ID);
-    if (def && def.json_data) applyTemplate(def.json_data);
-    else store.addPage();
+    if (def && def.json_data) {
+      applyTemplate(def.json_data);
+    } else {
+      store.addPage();
+    }
   } catch (e) {
-    console.warn('기본 템플릿 로드 실패:', e.message);
+    console.warn('기본 템플릿 로드 실패, 빈 캔버스로 시작:', e.message);
     store.addPage();
   }
 }
 loadDefaultTemplate();
-
-// ─── 캔버스 사이즈 변경 + 요소 자동 스케일 ───────────────────────────────
-function resizeCanvas(newW, newH) {
-  const page = store.activePage;
-  if (!page) return;
-
-  const oldW = store.width;
-  const oldH = store.height;
-
-  if (oldW === newW && oldH === newH) return;
-
-  const scaleX = newW / oldW;
-  const scaleY = newH / oldH;
-
-  // 모든 요소 위치/크기 스케일 조정
-  page.children.forEach(el => {
-    el.set({
-      x:      el.x      * scaleX,
-      y:      el.y      * scaleY,
-      width:  el.width  * scaleX,
-      height: el.height * scaleY,
-      // 텍스트 폰트사이즈도 비율에 맞게 조정
-      ...(el.type === 'text' ? { fontSize: Math.round(el.fontSize * Math.min(scaleX, scaleY)) } : {}),
-    });
-  });
-
-  store.setSize(newW, newH);
-}
-
-// ─── 사이즈 입력 컴포넌트 ────────────────────────────────────────────────
-const SizeInput = observer(() => {
-  const [w, setW] = useState(store.width || 6000);
-  const [h, setH] = useState(store.height || 900);
-  const [unit, setUnit] = useState('mm');
-
-  // 캔버스 사이즈 변경 시 입력창 동기화
-  useEffect(() => {
-    setW(store.width);
-    setH(store.height);
-  }, [store.width, store.height]);
-
-  const handleApply = () => {
-    const nw = parseInt(w);
-    const nh = parseInt(h);
-    if (!nw || !nh || nw < 100 || nh < 100) {
-      alert('최소 100 이상의 값을 입력해주세요.');
-      return;
-    }
-    resizeCanvas(nw, nh);
-  };
-
-  const inputStyle = {
-    width: 80, padding: '4px 6px', borderRadius: 6,
-    border: '1px solid #d1d5db', fontSize: 13,
-    textAlign: 'center', background: '#fff', color: '#1a1a1a',
-  };
-  const labelStyle = { fontSize: 12, color: '#6b7280', marginRight: 2 };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
-      <span style={{ fontSize: 12, color: '#374151', fontWeight: 500, marginRight: 4 }}>사이즈</span>
-
-      <span style={labelStyle}>가로</span>
-      <input
-        type="number"
-        value={w}
-        onChange={e => setW(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && handleApply()}
-        style={inputStyle}
-        min={100}
-      />
-
-      <span style={{ fontSize: 12, color: '#9ca3af' }}>×</span>
-
-      <span style={labelStyle}>세로</span>
-      <input
-        type="number"
-        value={h}
-        onChange={e => setH(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && handleApply()}
-        style={inputStyle}
-        min={100}
-      />
-
-      <select
-        value={unit}
-        onChange={e => setUnit(e.target.value)}
-        style={{ ...inputStyle, width: 52, padding: '4px 2px' }}
-      >
-        <option value="mm">mm</option>
-        <option value="cm">cm</option>
-        <option value="px">px</option>
-      </select>
-
-      <button
-        onClick={handleApply}
-        style={{
-          padding: '5px 12px', borderRadius: 6,
-          background: '#2563eb', color: '#fff',
-          border: 'none', cursor: 'pointer',
-          fontSize: 12, fontWeight: 'bold',
-        }}
-      >
-        적용
-      </button>
-    </div>
-  );
-});
 
 // ─── 심플 SVG 아이콘 ─────────────────────────────────────────────────────
 const TemplateIcon = () => (
@@ -232,9 +156,13 @@ const PhotoIcon = () => (
 // ─── 커스텀 "템플릿" 섹션 ────────────────────────────────────────────────
 const TemplateSection = {
   name: 'templates',
+
   Tab: (props) => (
-    <SectionTab name="템플릿" {...props}><TemplateIcon /></SectionTab>
+    <SectionTab name="템플릿" {...props}>
+      <TemplateIcon />
+    </SectionTab>
   ),
+
   Panel: observer(({ store }) => {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading]     = useState(false);
@@ -250,58 +178,114 @@ const TemplateSection = {
     };
     useEffect(() => { load(); }, []);
 
-    const categories = ['전체', ...new Set(templates.map(t => t.category))];
-    const filtered = category === '전체' ? templates : templates.filter(t => t.category === category);
-
+    // 경고창 없이 바로 적용
     const handleApply = async (tpl) => {
-      const ok = window.confirm(`"${tpl.name}" 템플릿을 적용하시겠습니까?\n현재 작업 중인 내용이 사라집니다.`);
-      if (!ok) return;
       setApplying(tpl.id);
       try { applyTemplate(tpl.json_data); }
       catch (e) { alert('템플릿 적용 실패: ' + e.message); }
       finally { setApplying(''); }
     };
 
+    // 카테고리별 픽토그램 (라인 SVG, 흰색)
+    const CAT_ICONS = {
+      '전체':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>,
+      '배너':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="1" y="3" width="12" height="8" rx="1.2"/><line x1="4" y1="6.5" x2="10" y2="6.5"/><line x1="4" y1="8.5" x2="8" y2="8.5"/></svg>,
+      '보드':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="2" y="1" width="10" height="12" rx="1.2"/><line x1="4.5" y1="4.5" x2="9.5" y2="4.5"/><line x1="4.5" y1="7" x2="9.5" y2="7"/><line x1="4.5" y1="9.5" x2="7.5" y2="9.5"/></svg>,
+      '현수막': <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><rect x="1" y="4" width="12" height="6" rx="1.2"/><line x1="3" y1="6.5" x2="11" y2="6.5"/><line x1="3" y1="8.5" x2="8" y2="8.5"/></svg>,
+      '기타':   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.4"><circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/><circle cx="11" cy="7" r="1"/></svg>,
+    };
+    const getIcon = (cat) => CAT_ICONS[cat] || CAT_ICONS['기타'];
+
+    const categories = ['전체', ...new Set(templates.map(t => t.category))];
+    const filtered = category === '전체' ? templates : templates.filter(t => t.category === category);
+    const isWide = (tpl) => tpl.category === '현수막';
+    const wideItems   = filtered.filter(isWide);
+    const normalItems = filtered.filter(t => !isWide(t));
+
+    const RefreshIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.5"
+        strokeLinecap="round" strokeLinejoin="round"
+        style={{ display:'inline', verticalAlign:'middle', marginRight:5 }}>
+        <path d="M12 7A5 5 0 1 1 9.5 2.5"/>
+        <polyline points="9.5 1 9.5 3.5 12 3.5"/>
+      </svg>
+    );
+
+    const TplCard = ({ tpl, fullWidth }) => (
+      <div onClick={() => handleApply(tpl)} style={{
+        cursor: 'pointer', borderRadius: 7, overflow: 'hidden',
+        border: applying === tpl.id ? '2px solid #3b82f6' : '1px solid #2d3748',
+        background: '#1a2236',
+        opacity: applying && applying !== tpl.id ? 0.4 : 1,
+        transition: 'opacity 0.15s, border-color 0.15s',
+      }}>
+        {tpl.thumbnail
+          ? <img src={tpl.thumbnail} alt={tpl.name} style={{ width:'100%', height:'auto', display:'block' }} />
+          : <div style={{ width:'100%', height: fullWidth ? 60 : 80, background:'#2d3748',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.4">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            </div>
+        }
+        <div style={{ padding: '5px 7px' }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 1 }}>{tpl.category}</div>
+          <div style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600, lineHeight: 1.3 }}>
+            {applying === tpl.id ? '적용 중…' : tpl.name}
+          </div>
+        </div>
+      </div>
+    );
+
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} style={{
-              padding: '4px 10px', borderRadius: 20, border: 'none',
-              cursor: 'pointer', fontSize: 12, fontWeight: 'bold',
-              background: category === cat ? '#2563eb' : '#334155', color: '#fff',
-            }}>{cat}</button>
-          ))}
+        {/* 카테고리 필터 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+          {categories.map(cat => {
+            const active = category === cat;
+            return (
+              <button key={cat} onClick={() => setCategory(cat)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 20,
+                border: active ? '1.5px solid #3b82f6' : '1.5px solid transparent',
+                background: active ? 'rgba(59,130,246,0.18)' : '#1e293b',
+                color: '#fff',
+                cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                transition: 'all 0.15s',
+              }}>
+                {getIcon(cat)}{cat}
+              </button>
+            );
+          })}
         </div>
-        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
-        {loading && <div style={{ color: '#94a3b8', padding: 8, fontSize: 12, textAlign: 'center' }}>불러오는 중...</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {filtered.map(tpl => (
-            <div key={tpl.id} onClick={() => handleApply(tpl)} style={{
-              cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
-              border: applying === tpl.id ? '2px solid #2563eb' : '1px solid #334155',
-              background: '#1e293b',
-              opacity: applying && applying !== tpl.id ? 0.5 : 1,
-              transition: 'opacity 0.2s',
-            }}>
-              {tpl.thumbnail
-                ? <img src={tpl.thumbnail} alt={tpl.name} style={{ width: '100%', height: 'auto', display: 'block' }} />
-                : <div style={{ width: '100%', height: 80, background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📄</div>
-              }
-              <div style={{ padding: '6px 8px' }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{tpl.category}</div>
-                <div style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 'bold', lineHeight: 1.3 }}>
-                  {applying === tpl.id ? '적용 중...' : tpl.name}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+
+        {error && <div style={{ color:'#f87171', padding:'6px 8px', fontSize:11,
+          background:'rgba(248,113,113,0.08)', borderRadius:6, marginBottom:8 }}>⚠ {error}</div>}
+        {loading && <div style={{ color:'#64748b', padding:8, fontSize:12, textAlign:'center' }}>불러오는 중…</div>}
+
+        {/* 현수막(가로형) — 1열 */}
+        {wideItems.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8,
+            marginBottom: normalItems.length > 0 ? 10 : 0 }}>
+            {wideItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} fullWidth />)}
+          </div>
+        )}
+        {/* 일반형 — 2열 */}
+        {normalItems.length > 0 && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {normalItems.map(tpl => <TplCard key={tpl.id} tpl={tpl} />)}
+          </div>
+        )}
+
         <button onClick={load} style={{
-          width: '100%', marginTop: 12, padding: '6px',
-          background: '#475569', color: '#fff', border: 'none',
-          borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>🔄 목록 새로고침</button>
+          width:'100%', marginTop:12, padding:'7px',
+          background:'#1e293b', color:'#fff',
+          border:'1px solid #2d3748', borderRadius:6,
+          cursor:'pointer', fontSize:11, fontWeight:500,
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <RefreshIcon />목록 새로고침
+        </button>
       </div>
     );
   }),
@@ -309,49 +293,70 @@ const TemplateSection = {
 
 // ─── Cloudinary 이미지 목록 불러오기 ─────────────────────────────────────
 async function fetchCloudinaryImages() {
-  const resp = await fetch(`https://res.cloudinary.com/${CLOUD_NAME}/image/list/${TAG}.json`);
+  const resp = await fetch(
+    `https://res.cloudinary.com/${CLOUD_NAME}/image/list/${TAG}.json`
+  );
   if (!resp.ok) throw new Error('이미지 목록 불러오기 실패: ' + resp.status);
   const data = await resp.json();
   return data.resources.map((r) => ({
-    url:   `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${r.public_id}.${r.format}`,
-    thumb: `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_200,h_200,c_fill/${r.public_id}.${r.format}`,
-    width: r.width, height: r.height, name: r.public_id,
+    url:    `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${r.public_id}.${r.format}`,
+    thumb:  `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_200,h_200,c_fill/${r.public_id}.${r.format}`,
+    width:  r.width,
+    height: r.height,
+    name:   r.public_id,
   }));
 }
 
 // ─── 커스텀 "내 사진" 섹션 ────────────────────────────────────────────────
 const CloudinarySection = {
   name: 'cloudinary-photos',
+
   Tab: (props) => (
-    <SectionTab name="내 사진" {...props}><PhotoIcon /></SectionTab>
+    <SectionTab name="내 사진" {...props}>
+      <PhotoIcon />
+    </SectionTab>
   ),
+
   Panel: observer(({ store }) => {
     const [images, setImages]   = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError]     = useState('');
 
     const load = async () => {
-      setLoading(true); setError('');
-      try { setImages(await fetchCloudinaryImages()); }
-      catch (e) { setError(e.message); }
-      finally { setLoading(false); }
+      setLoading(true);
+      setError('');
+      try {
+        const imgs = await fetchCloudinaryImages();
+        setImages(imgs);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
     };
+
     useEffect(() => { load(); }, []);
 
     const handleSelect = (img) => {
       store.activePage.addElement({
-        type: 'image', src: img.url, x: 100, y: 100,
-        width: Math.min(img.width, 1200), height: Math.min(img.height, 800),
+        type: 'image', src: img.url,
+        x: 100, y: 100,
+        width:  Math.min(img.width,  1200),
+        height: Math.min(img.height, 800),
       });
     };
 
     return (
       <div style={{ padding: '8px', height: '100%', overflowY: 'auto' }}>
-        {error && <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>}
+        {error && (
+          <div style={{ color: '#f87171', padding: 8, fontSize: 12 }}>⚠️ {error}</div>
+        )}
         <ImagesGrid
-          images={images} getPreview={(img) => img.thumb}
+          images={images}
+          getPreview={(img) => img.thumb}
           isLoading={loading && images.length === 0}
-          onSelect={handleSelect} rowsNumber={2}
+          onSelect={handleSelect}
+          rowsNumber={2}
         />
         <button onClick={load} style={{
           width: '100%', marginTop: 8, padding: '6px',
@@ -366,12 +371,13 @@ const CloudinarySection = {
 // ─── 섹션 구성 ───────────────────────────────────────────────────────────
 const customSections = [
   TemplateSection,
-  ...DEFAULT_SECTIONS.map((s) => s.name === 'photos' ? CloudinarySection : s),
+  ...DEFAULT_SECTIONS
+    .filter(s => s.name !== 'templates')
+    .map(s => s.name === 'photos' ? CloudinarySection : s),
 ];
 
-// ─── 확정 / JSON / 사이즈입력 버튼 ───────────────────────────────────────
-function ConfirmButton() {
-  const [loading, setLoading]   = useState(false);
+// ─── 확정 / JSON 버튼 ────────────────────────────────────────────────────
+function ConfirmButton({ onOpen }) {
   const [showJson, setShowJson] = useState(false);
   const [jsonText, setJsonText] = useState('');
 
@@ -379,7 +385,10 @@ function ConfirmButton() {
     setJsonText(JSON.stringify(store.toJSON(), null, 2));
     setShowJson(true);
   };
-  const handleCopyJson = () => { navigator.clipboard.writeText(jsonText); alert('JSON이 클립보드에 복사되었습니다!'); };
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(jsonText);
+    alert('JSON이 클립보드에 복사되었습니다!');
+  };
   const handleDownloadJson = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([jsonText], { type: 'application/json' }));
@@ -387,34 +396,10 @@ function ConfirmButton() {
     a.click();
   };
 
-  const handleExport = async () => {
-    const ok = window.confirm('이 시안으로 진행하시겠습니까?\n\n확인을 누르면 발주 폼으로 이동합니다.');
-    if (!ok) return;
-    setLoading(true);
-    try {
-      const dataUrl = await store.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
-      const formData = new FormData();
-      formData.append('file', dataUrl);
-      formData.append('upload_preset', 'etoo_preset');
-      const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (!data.secure_url) throw new Error('이미지 업로드 실패');
-      const projectId = 'ETOO_' + Date.now();
-      // 캔버스 사이즈도 같이 전달
-      const w = store.width;
-      const h = store.height;
-      window.top.location.href =
-        `https://tally.so/r/xXNz09?project_id=${projectId}&image_url=${encodeURIComponent(data.secure_url)}&width=${w}&height=${h}`;
-    } catch (err) {
-      alert('시안 저장 중 문제가 생겼습니다: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const btn = (bg, label, onClick, disabled = false) => (
     <button onClick={onClick} disabled={disabled} style={{
-      background: disabled ? '#888' : bg, color: 'white', border: 'none',
+      background: disabled ? '#888' : bg,
+      color: 'white', border: 'none',
       padding: '10px 16px', borderRadius: 6,
       cursor: disabled ? 'not-allowed' : 'pointer',
       fontWeight: 'bold', marginLeft: 8, fontSize: 13,
@@ -430,48 +415,185 @@ function ConfirmButton() {
         }}>
           <div style={{
             background: '#1e1e2e', borderRadius: 10, padding: 24,
-            width: '70vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 12,
+            width: '70vw', maxHeight: '80vh',
+            display: 'flex', flexDirection: 'column', gap: 12,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 'bold' }}>📋 JSON 코드</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                {btn('#10b981', '복사', handleCopyJson)}
+                {btn('#10b981', '복사',     handleCopyJson)}
                 {btn('#6366f1', '다운로드', handleDownloadJson)}
-                {btn('#ef4444', '닫기', () => setShowJson(false))}
+                {btn('#ef4444', '닫기',     () => setShowJson(false))}
               </div>
             </div>
             <textarea readOnly value={jsonText} style={{
-              flex: 1, minHeight: '50vh', background: '#13131f', color: '#a6e3a1',
-              border: '1px solid #333', borderRadius: 6, padding: 12,
-              fontFamily: 'monospace', fontSize: 12, resize: 'none', outline: 'none',
+              flex: 1, minHeight: '50vh',
+              background: '#13131f', color: '#a6e3a1',
+              border: '1px solid #333', borderRadius: 6,
+              padding: 12, fontFamily: 'monospace',
+              fontSize: 12, resize: 'none', outline: 'none',
             }} />
           </div>
         </div>
       )}
-
-      {/* 사이즈 입력창 */}
-      <SizeInput />
-
       {btn('#475569', '🗂️ JSON 추출', handleExportJson)}
-      {btn(
-        loading ? '#888' : '#2563eb',
-        loading ? '시안 찍는 중...' : '✅ 시안확정 (발주하기)',
-        handleExport, loading
-      )}
+      {btn('#2563eb', '✅ 시안확정 (발주하기)', onOpen)}
     </>
+  );
+}
+
+// ─── 스플래시 스크린 ─────────────────────────────────────────────────────
+const LOGO_URL = 'https://res.cloudinary.com/dm1rqkqbj/image/upload/v1776926903/%ED%9A%8C%EC%82%AC%EB%A1%9C%EA%B3%A0_tp7ewe.png';
+
+function SplashScreen({ onDone }) {
+  const [phase, setPhase] = React.useState('in'); // 'in' | 'hold' | 'out'
+  React.useEffect(() => {
+    const t1 = setTimeout(() => setPhase('hold'), 800);
+    const t2 = setTimeout(() => setPhase('out'),  2000);
+    const t3 = setTimeout(() => onDone(),          2600);
+    return () => [t1, t2, t3].forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 99999,
+      background: '#0f172a',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      opacity: phase === 'out' ? 0 : 1,
+      transition: phase === 'out' ? 'opacity 0.6s ease' : 'none',
+      pointerEvents: 'none',
+    }}>
+      {/* 링 이펙트 */}
+      <div style={{ position: 'relative', width: 160, height: 160,
+        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '50%',
+          border: '2px solid rgba(59,130,246,0.25)',
+          animation: 'splash-ring 1.8s ease-out infinite',
+        }}/>
+        <div style={{
+          position: 'absolute', inset: 12, borderRadius: '50%',
+          border: '1.5px solid rgba(59,130,246,0.15)',
+          animation: 'splash-ring 1.8s ease-out 0.3s infinite',
+        }}/>
+        {/* 로고 */}
+        <img src={LOGO_URL} alt="logo"
+          style={{
+            width: 110, height: 110, objectFit: 'contain',
+            opacity: phase === 'in' ? 0 : 1,
+            transform: phase === 'in' ? 'scale(0.8)' : 'scale(1)',
+            transition: 'opacity 0.5s ease, transform 0.5s ease',
+          }}
+        />
+      </div>
+      <style>{`
+        @keyframes splash-ring {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── 커스텀 확정 모달 ─────────────────────────────────────────────────────
+function ConfirmModal({ onConfirm, onCancel, loading }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#1e293b', borderRadius: 16, padding: '32px 36px',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
+        minWidth: 320, maxWidth: 400,
+        animation: 'modal-in 0.25s cubic-bezier(.34,1.56,.64,1)',
+      }}>
+        <style>{`@keyframes modal-in { from { opacity:0; transform:scale(.9) } to { opacity:1; transform:scale(1) } }`}</style>
+        <img src={LOGO_URL} alt="logo" style={{ width: 64, objectFit: 'contain', opacity: 0.9 }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
+            이 시안으로 진행할까요?
+          </div>
+          <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.6 }}>
+            확인을 누르면 시안을 저장하고<br/>발주 폼으로 이동합니다.
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <button onClick={onCancel} disabled={loading} style={{
+            flex: 1, padding: '11px', borderRadius: 8,
+            background: '#334155', border: 'none', color: '#94a3b8',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}>취소</button>
+          <button onClick={onConfirm} disabled={loading} style={{
+            flex: 2, padding: '11px', borderRadius: 8,
+            background: loading ? '#1d4ed8' : '#2563eb',
+            border: 'none', color: '#fff',
+            fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            {loading
+              ? <><span style={{ display:'inline-block', width:14, height:14, border:'2px solid rgba(255,255,255,0.4)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/> 저장 중…</>
+              : '✅ 발주하기'}
+          </button>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    </div>
   );
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────
 function App() {
+  const [splash, setSplash]         = React.useState(true);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+  const [exporting, setExporting]   = React.useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const dataUrl = await store.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
+      const formData = new FormData();
+      formData.append('file', dataUrl);
+      formData.append('upload_preset', 'etoo_preset');
+      const resp = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      const data = await resp.json();
+      if (!data.secure_url) throw new Error('이미지 업로드 실패');
+      const projectId = 'ETOO_' + Date.now();
+      window.top.location.href =
+        `https://tally.so/r/xXNz09?project_id=${projectId}&image_url=${encodeURIComponent(data.secure_url)}`;
+    } catch (err) {
+      alert('시안 저장 중 문제가 생겼습니다: ' + err.message);
+    } finally {
+      setExporting(false);
+      setShowConfirm(false);
+    }
+  };
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
+      {splash && <SplashScreen onDone={() => setSplash(false)} />}
+      {showConfirm && (
+        <ConfirmModal
+          loading={exporting}
+          onConfirm={handleExport}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
       <PolotnoContainer>
         <SidePanelWrap>
           <SidePanel store={store} sections={customSections} />
         </SidePanelWrap>
         <WorkspaceWrap>
-          <Toolbar store={store} components={{ ActionControls: ConfirmButton }} />
+          <Toolbar store={store} components={{ ActionControls: () =>
+            <ConfirmButton onOpen={() => setShowConfirm(true)} />
+          }} />
           <Workspace store={store} />
           <ZoomButtons store={store} />
         </WorkspaceWrap>
