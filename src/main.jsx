@@ -142,6 +142,11 @@ function resizeCanvas(newW, newH) {
   const oldW = store.width, oldH = store.height;
   if (oldW === newW && oldH === newH) return;
   const scaleX = newW / oldW, scaleY = newH / oldH;
+
+  // 1) 먼저 캔버스 크기 변경
+  store.setSize(newW, newH);
+
+  // 2) 이후 모든 요소를 비율에 맞게 재배치 (Magic Resize)
   page.children.forEach(el => {
     const updates = {
       x: el.x * scaleX,
@@ -149,10 +154,11 @@ function resizeCanvas(newW, newH) {
       width: el.width * scaleX,
       height: el.height * scaleY,
     };
-    if (el.type === 'text') updates.fontSize = Math.round(el.fontSize * Math.min(scaleX, scaleY));
+    if (el.type === 'text') {
+      updates.fontSize = Math.max(1, Math.round(el.fontSize * Math.min(scaleX, scaleY)));
+    }
     el.set(updates);
   });
-  store.setSize(newW, newH);
 }
 
 // ─── 사이즈 입력 (Magic Resize 항상 적용) ────────────────────────────────
@@ -183,7 +189,7 @@ const SizeInput = observer(() => {
       <button onClick={apply} style={{
         padding:'6px 14px', borderRadius:6, background:'#2563eb', color:'#fff',
         border:'none', cursor:'pointer', fontSize:13, fontWeight:700, height:32,
-      }}>✨ 적용</button>
+      }}>적용</button>
     </div>
   );
 });
@@ -458,8 +464,6 @@ function FloatingPanel({ store }) {
                 { label:'삭제',     icon:'✕', action: ()=> sel && sel.remove?.(), danger:true },
                 { label:'가로 중앙', icon:'↔', action: ()=> { if(sel) sel.set({ x: (store.width - sel.width)/2 }); } },
                 { label:'세로 중앙', icon:'↕', action: ()=> { if(sel) sel.set({ y: (store.height - sel.height)/2 }); } },
-                { label:'좌우반전', icon:'⇄', action: ()=> { if(sel) sel.set({ flipX: !sel.flipX }); } },
-                { label:'상하반전', icon:'⇅', action: ()=> { if(sel) sel.set({ flipY: !sel.flipY }); } },
                 { label:'실행취소', icon:'↩', action: ()=> store.history?.undo?.() },
                 { label:'다시실행', icon:'↪', action: ()=> store.history?.redo?.() },
               ].map(({label,icon,action,danger})=>(
@@ -779,7 +783,7 @@ function App() {
       <FloatingPanel store={store}/>
       <PolotnoContainer>
         <SidePanelWrap>
-          <SidePanel store={store} sections={customSections}/>
+          <SidePanel store={store} sections={customSections} defaultSection="templates"/>
         </SidePanelWrap>
         <WorkspaceWrap>
           <Toolbar store={store} components={{ ActionControls: ()=>
