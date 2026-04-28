@@ -136,29 +136,11 @@ function setupAutoFit() {
 }
 setupAutoFit();
 
-// ─── 캔버스 리사이즈 (Magic Resize: 요소 비율 자동 조정) ─────────────────
+// ─── 캔버스 리사이즈 (Polotno 내장 Smart Resize — 좌측 패널과 완전히 동일) ──
 function resizeCanvas(newW, newH) {
-  const page = store.activePage; if (!page) return;
-  const oldW = store.width, oldH = store.height;
-  if (oldW === newW && oldH === newH) return;
-  const scaleX = newW / oldW, scaleY = newH / oldH;
-
-  // 1) 먼저 캔버스 크기 변경
-  store.setSize(newW, newH);
-
-  // 2) 이후 모든 요소를 비율에 맞게 재배치 (Magic Resize)
-  page.children.forEach(el => {
-    const updates = {
-      x: el.x * scaleX,
-      y: el.y * scaleY,
-      width: el.width * scaleX,
-      height: el.height * scaleY,
-    };
-    if (el.type === 'text') {
-      updates.fontSize = Math.max(1, Math.round(el.fontSize * Math.min(scaleX, scaleY)));
-    }
-    el.set(updates);
-  });
+  if (store.width === newW && store.height === newH) return;
+  // useSmartResize: true → 좌측 Resize 패널의 "Use Magic Resize" 토글과 동일한 내장 알고리즘
+  store.setSize(newW, newH, { useSmartResize: true });
 }
 
 // ─── 사이즈 입력 (Magic Resize 항상 적용) ────────────────────────────────
